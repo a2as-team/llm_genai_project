@@ -1,0 +1,31 @@
+{
+  "orderId": "480dfd43-f5e2-46d0-bcb0-b8ee33b3770b",
+  "customerName": null,
+  "items": [
+    {
+      "itemId": "plat_007",
+      "quantity": 1,
+      "price": 14.0,
+      "indications": null
+    },
+    {
+      "itemId": "plat_019",
+      "quantity": 1,
+      "price": 14.5,
+      "indications": null
+    },
+    {
+      "itemId": "des_001",
+      "quantity": 1,
+      "price": 7.5,
+      "indications": null
+    },
+    {
+      "itemId": "plat_019",
+      "quantity": 1,
+      "price": 14.5,
+      "indications": "sans calamars"
+    }
+  ],
+  "isValidated": false
+}

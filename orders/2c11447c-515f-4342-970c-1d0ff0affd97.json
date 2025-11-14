@@ -1,0 +1,15 @@
+{
+  "orderId": "2c11447c-515f-4342-970c-1d0ff0affd97",
+  "customerName": null,
+  "formules": [
+    {
+      "formuleId": "form_004",
+      "formuleName": "Formule Duo (2 personnes)",
+      "formulaBasePrice": 35.0,
+      "items": [],
+      "quantity": 1
+    }
+  ],
+  "items": [],
+  "isValidated": false
+}

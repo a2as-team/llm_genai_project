@@ -1,0 +1,12 @@
+from google.adk.agents import LlmAgent
+from config import gemini_settings
+from prompts import ROOT_PROMPT
+from .bookingAgent import booking_agent
+from .orderAgent import order_agent
+
+root_agent = LlmAgent(
+    name="rootAgent",
+    model=gemini_settings.MODEL_NAME,
+    instruction=ROOT_PROMPT,
+    sub_agents=[booking_agent, order_agent],
+)
