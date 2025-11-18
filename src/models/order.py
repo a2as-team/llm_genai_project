@@ -1,42 +1,63 @@
 from pydantic import BaseModel, Field
+from uuid import UUID
 from typing import Optional, List
 
 
-class Item(BaseModel):
-    itemId: str
+# -----------------------------
+# Menu Items (static menu)
+# -----------------------------
+class MenuItem(BaseModel):
+    id: UUID
+    name: str
+    price: float
+    description: Optional[str] = None
+
+
+# -----------------------------
+# Order Items (items inside an order)
+# -----------------------------
+class OrderItem(BaseModel):
+    id: UUID
+    itemId: UUID        # FK → MenuItem
+    name: str
     quantity: int = 1
     price: float
-    indications: Optional[str] = Field(None, description="par exemple: 'sans oignons'")
+    indications: Optional[str] = None
 
 
+# -----------------------------
+# Formule (menu)
+# -----------------------------
 class Formule(BaseModel):
-    """Classe de base pour toutes les formules"""
-
-    id: str
+    id: UUID
     name: str
     price: float
     description: str
-    items: List[Item] = Field(default_factory=list)
+    items: List[MenuItem] = Field(default_factory=list)
 
 
+# -----------------------------
+# OrderFormule (instance in order)
+# -----------------------------
 class OrderFormule(BaseModel):
-    """Une formule dans une commande - peut être modifiée indépendamment"""
-
-    formuleId: str  # Référence à la formule (ex: "form_001")
-    formuleName: str  # Nom de la formule à la commande
-    formulaBasePrice: float  # Prix de base de la formule
-    items: List[Item] = Field(
-        default_factory=list
-    )  # Items actuels (peuvent être modifiés)
-    quantity: int = 1  # Nombre de fois cette formule est commandée
+    id: UUID                    # PK côté commande
+    formuleId: UUID            # FK → Formule
+    formuleName: str
+    formulaBasePrice: float
+    quantity: int = 1
+    items: List[OrderItem] = Field(default_factory=list)
 
 
+# -----------------------------
+# Order
+# -----------------------------
 class Order(BaseModel):
-    orderId: str
+    orderId: UUID
     customerName: Optional[str] = None
-    formules: List[OrderFormule] = Field(default_factory=list)  # Formules commandées
-    items: List[Item] = Field(default_factory=list)  # Items individuels (non-formule)
+    formules: List[OrderFormule] = Field(default_factory=list)
+    items: List[OrderItem] = Field(default_factory=list)
     isValidated: bool = False
+
 
 
 # Instances de formules prédéfinies
