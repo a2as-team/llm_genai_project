@@ -1,4 +1,4 @@
-from config import GeminiSettings
+from src.config import GeminiSettings
 
 settings = GeminiSettings()
 client = settings.CLIENT

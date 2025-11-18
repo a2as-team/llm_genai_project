@@ -1,8 +1,8 @@
 from google.adk.agents import LlmAgent
 from config import gemini_settings
 from prompts import ROOT_PROMPT
-from .bookingAgent import booking_agent
-from .orderAgent import order_agent
+from agents.sub_agents import booking_agent,order_agent
+
 
 root_agent = LlmAgent(
     name="rootAgent",
