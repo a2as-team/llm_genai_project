@@ -1,6 +1,6 @@
 from uuid import uuid4
 import json
-from models import Order
+from ...models import Order
 
 
 async def create_order():

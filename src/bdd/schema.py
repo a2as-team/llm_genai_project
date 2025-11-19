@@ -80,7 +80,10 @@ class MenuItem(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    price: Mapped[float] = mapped_column(Numeric(10,2), nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+
+    type: Mapped[str] = mapped_column(String, nullable=False)  # entrée / plat / dessert / boisson
+    vegetarian: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now()
@@ -238,3 +241,55 @@ class OrderItem(Base):
 
     order: Mapped["Order"] = relationship("Order", back_populates="items")
     item: Mapped["MenuItem"] = relationship("MenuItem")
+
+class RestaurantInfo(Base):
+    __tablename__ = "restaurant_info"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    address: Mapped[str] = mapped_column(String, nullable=False)
+    metro: Mapped[str] = mapped_column(String)
+    rer: Mapped[str] = mapped_column(String)
+    parking: Mapped[str] = mapped_column(String)
+    phone_number: Mapped[str] = mapped_column(String)
+    website: Mapped[str] = mapped_column(String)
+
+    cuisine: Mapped[str] = mapped_column(String)
+    specialties: Mapped[str] = mapped_column(Text)      # JSON string or comma-separated
+    terrace: Mapped[bool] = mapped_column(Boolean, default=False)
+    takeaway: Mapped[bool] = mapped_column(Boolean, default=False)
+    delivery: Mapped[bool] = mapped_column(Boolean, default=False)
+    child_friendly: Mapped[bool] = mapped_column(Boolean, default=False)
+    pets_allowed: Mapped[bool] = mapped_column(Boolean, default=False)
+    payment_methods: Mapped[str] = mapped_column(Text)  # JSON string
+    ambiance: Mapped[str] = mapped_column(Text)
+    accessibility: Mapped[str] = mapped_column(Text)
+
+    lunch_open: Mapped[str] = mapped_column(String)
+    lunch_close: Mapped[str] = mapped_column(String)
+    dinner_open: Mapped[str] = mapped_column(String)
+    dinner_close: Mapped[str] = mapped_column(String)
+
+    open_days: Mapped[str] = mapped_column(String)
+
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now()
+    )
+
+class RestaurantSettings(Base):
+    __tablename__ = "restaurant_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    average_duration_minutes: Mapped[int] = mapped_column(Integer, default=120)
+    buffer_time_minutes: Mapped[int] = mapped_column(Integer, default=15)
+
+
+class ServicePeriod(Base):
+    __tablename__ = "service_periods"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String)  # lunch/dinner
+    opening_hour: Mapped[str] = mapped_column(String)
+    closing_hour: Mapped[str] = mapped_column(String)
+

@@ -1,7 +1,7 @@
 import json
 import pandas as pd
 from pydantic import BaseModel
-from models import Order, Item
+from ...models import Order, Item
 from typing import List, Optional
 
 

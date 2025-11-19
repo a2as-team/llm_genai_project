@@ -10,10 +10,11 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 from uuid import uuid4
 
-import json
 from google.adk.sessions import DatabaseSessionService
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
+from src.config import database_settings
+from src.bdd.query import CHECK_TABLES, CLEAR_ALL_TABLES, DROP_ALL_TABLES, ENABLE_PGCRYPTO, POPULATE_TABLES, POPULATE_FORMULES, POPULATE_MENU_ITEMS,POPULATE_RESTAURANT_INFOS,POPULATE_RESTAURANT_SETTINGS
+from src.bdd.schema import Base
 
 # Database URL configuration
 DATABASE_URL_SYNC = database_settings.dsn
@@ -102,3 +103,16 @@ class DBManager:
             tables = [row[0] for row in result.fetchall()]
         print("📋 Existing tables:", tables)
         return tables
+    
+    async def populate_initial_data(self):
+        """Populate initial data into the database."""
+        async with self.engine.begin() as conn:
+            await conn.execute(ENABLE_PGCRYPTO)
+            await conn.execute(POPULATE_TABLES)
+            await conn.execute(POPULATE_FORMULES)
+            await conn.execute(POPULATE_MENU_ITEMS)
+            await conn.execute(POPULATE_RESTAURANT_SETTINGS)
+            await conn.execute(POPULATE_RESTAURANT_INFOS)
+        print("🌱 Initial data populated.")
+
+

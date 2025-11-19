@@ -1,12 +1,12 @@
-from .order import Order, Item, Formule, OrderFormule, FORMULES
+from .order import Order, MenuItem, Formule, OrderFormule, OrderItem
 from .booking import Table,Reservation,ServicePeriod,RestaurantSettings,GetTableAvailabilityRequest
 
 __all__ = [
     "Order",
-    "Item",
+    "MenuItem",
     "Formule",
     "OrderFormule",
-    "FORMULES",
+    "OrderItem",
     "Table",
     "Reservation",
     "ServicePeriod",

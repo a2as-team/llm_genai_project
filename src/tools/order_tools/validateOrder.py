@@ -1,5 +1,5 @@
 import json
-from models import Order
+from ...models import Order
 
 
 async def validate_order(orderId: str, customerName: str) -> bool:
