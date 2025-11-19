@@ -288,3 +288,8 @@ VALUES (
     15
 );
 """)
+
+GET_MENU = text("""
+SELECT name,description,price,type,vegetarian
+FROM menu_items
+""")

@@ -1,7 +1,7 @@
 from google.adk.agents import LlmAgent
-from ...config import gemini_settings
-from ...prompts import ROOT_PROMPT
-from ..sub_agents import booking_agent, order_agent
+from src.config import gemini_settings
+from src.prompts import ROOT_PROMPT
+from src.agents.sub_agents import booking_agent, order_agent
 
 
 root_agent = LlmAgent(

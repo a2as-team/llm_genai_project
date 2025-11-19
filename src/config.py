@@ -2,6 +2,33 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from google import genai
 from urllib.parse import quote_plus
 
+
+class AppSettings(BaseSettings):
+    """
+    Application environment settings.
+
+    Loads configuration from .env file with strict validation.
+    Settings:
+        - APP_NAME: Application name
+        - ENV: Environment (dev, prod, staging)
+        - HOST: Server host address
+        - PORT: Server port number
+        - DEBUG: Debug mode flag
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
+
+    APP_NAME: str
+    ENV: str
+    HOST: str
+    PORT: int
+    DEBUG: bool
+
 class GeminiSettings(BaseSettings):
     GOOGLE_API_KEY: str
     MODEL_NAME: str
@@ -57,6 +84,7 @@ class DatabaseSettings(BaseSettings):
 
 gemini_settings = GeminiSettings()
 database_settings = DatabaseSettings()  # type: ignore
+app_settings = AppSettings() # type: ignore
 
 
 

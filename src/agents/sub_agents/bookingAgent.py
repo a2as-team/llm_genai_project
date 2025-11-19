@@ -1,6 +1,6 @@
 from google.adk.agents import LlmAgent
-from ...config import gemini_settings
-from ...prompts import BOOKING_PROMPT
+from src.config import gemini_settings
+from src.prompts import BOOKING_PROMPT
 
 booking_agent = LlmAgent(
     name="bookingAgent",

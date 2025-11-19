@@ -13,7 +13,7 @@ from uuid import uuid4
 from google.adk.sessions import DatabaseSessionService
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from src.config import database_settings
-from src.bdd.query import CHECK_TABLES, CLEAR_ALL_TABLES, DROP_ALL_TABLES, ENABLE_PGCRYPTO, POPULATE_TABLES, POPULATE_FORMULES, POPULATE_MENU_ITEMS,POPULATE_RESTAURANT_INFOS,POPULATE_RESTAURANT_SETTINGS
+from src.bdd.query import *
 from src.bdd.schema import Base
 
 # Database URL configuration
@@ -115,4 +115,13 @@ class DBManager:
             await conn.execute(POPULATE_RESTAURANT_INFOS)
         print("🌱 Initial data populated.")
 
+# -----------------------------------------------------
+
+    async def get_menu(self):
+        """Retrieve the menu from the database."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_MENU)
+            menu_items = result.fetchall()
+        print("📋 Menu retrieved:", menu_items)
+        return menu_items
 

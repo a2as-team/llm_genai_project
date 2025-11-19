@@ -1,7 +1,7 @@
 from google.adk.agents import LlmAgent
-from ...config import gemini_settings
-from ...prompts import ORDER_PROMPT
-from ...tools import (
+from src.config import gemini_settings
+from src.prompts import ORDER_PROMPT
+from src.tools import (
     add_item_to_order,
     create_order,
     get_menu,

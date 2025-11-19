@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import asyncpg
 from asyncpg import Pool
 
-from ..config import database_settings
+from src.config import database_settings
 
 logger = logging.getLogger(__name__)
 

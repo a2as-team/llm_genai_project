@@ -1,4 +1,4 @@
-from models import GetTableAvailabilityRequest
+from src.models import GetTableAvailabilityRequest
 from .optimizeTableAssignment import optimize_table_assignment
 from .findClosestAvailableTime import find_closest_available_time
 
