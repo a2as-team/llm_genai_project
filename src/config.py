@@ -32,6 +32,9 @@ class AppSettings(BaseSettings):
 class GeminiSettings(BaseSettings):
     GOOGLE_API_KEY: str
     MODEL_NAME: str
+    LIVE_MODEL_NAME: str
+    AGENT_VOICE: str
+    AGENT_LANGUAGE: str
 
     model_config = SettingsConfigDict(
         env_file=".env",

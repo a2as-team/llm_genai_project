@@ -1,4 +1,4 @@
-from google.adk.agents import LlmAgent
+from google.adk.agents import LlmAgent,Agent
 from src.config import gemini_settings
 from src.prompts import ORDER_PROMPT
 from src.tools import (
@@ -14,9 +14,9 @@ from src.tools import (
     remove_formule,
 )
 
-order_agent = LlmAgent(
+order_agent = Agent(
     name="orderAgent",
-    model=gemini_settings.MODEL_NAME,
+    model=gemini_settings.LIVE_MODEL_NAME,
     instruction=ORDER_PROMPT,
     tools=[
         create_order,

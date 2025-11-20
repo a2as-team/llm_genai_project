@@ -5,7 +5,7 @@ logger = getLogger(__name__)
 
 async def get_menu()->str:
     """
-    Returns the menu string.
+    Return the complete menu of the restaurant.
     """
     try:
         db_manager = DBManager()

@@ -16,3 +16,15 @@ promotions.
 The result will be a fully voice-driven AI receptionist that simulates a real conversational 
 restaurant assistant, capable of operating offline (using local models via Ollama) or online (using 
 APIs such as Google AI SDK).
+
+
+Zephyr : Lumineux	Puck : Upbeat	Charon : Contenu informatif
+Kore : ferme	Fenrir : excitabilité	Leda : Jeune
+Orus : cabinet d'avocats	Aoede : Breezy	Callirrhoe : tranquille
+Autonoe : Lumineux	Enceladus : Souffle	Iapetus : Effacer
+Umbriel : décontracté	Algieba : Smooth	Despina : Lisse
+Erinome : dégagé	Algenib : Graveleux	Rasalgethi : informatif
+Laomedeia : Upbeat	Achernar : Soft	Alnilam : Ferme
+Schedar : Even	Gacrux : Contenu réservé aux adultes	Pulcherrima : franche
+Achird : amical	Zubenelgenubi : Décontracté	Vindemiatrix : Doux
+Sadachbia : Lively	Sadaltager : connaissances	Sulafat : chaude
