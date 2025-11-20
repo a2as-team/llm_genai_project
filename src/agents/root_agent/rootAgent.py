@@ -4,6 +4,7 @@ from src.prompts import ROOT_PROMPT
 from src.agents.sub_agents import booking_agent, order_agent
 from src.tools import (
     get_menu,
+    get_informations,
 )
 
 
@@ -19,5 +20,5 @@ root_agent = Agent(
     model=gemini_settings.LIVE_MODEL_NAME,
     instruction=ROOT_PROMPT,
     # sub_agents=[booking_agent, order_agent],
-    tools=[get_menu],  
+    tools=[get_menu,get_informations],  
 )

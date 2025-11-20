@@ -9,12 +9,13 @@ Some functions are created but not yet used in the codebase.
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 from uuid import uuid4
-
+import json
 from google.adk.sessions import DatabaseSessionService
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from src.config import database_settings
 from src.bdd.query import *
 from src.bdd.schema import Base
+from src.models.order import Order
 
 # Database URL configuration
 DATABASE_URL_SYNC = database_settings.dsn
@@ -124,4 +125,24 @@ class DBManager:
             menu_items = result.fetchall()
         print("📋 Menu retrieved:", menu_items)
         return menu_items
+    
+    async def get_informations(self):
+        """Retrieve the informations of the restaurant from the database."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_INFORMATIONS)
+            informations = result.fetchall()
+        print("📋 Informations retrieved:", informations)
+        return informations
+    
+    async def save_order(self, order: Order):
+        """Save an order to the database."""
+        async with self.engine.begin() as conn:
+            await conn.execute(SAVE_ORDER, {
+                'order_id': str(order.orderId),
+                'customer_name': order.customerName,
+                'formules': json.dumps([formule.dict() for formule in order.formules]),
+                'items': json.dumps([item.dict() for item in order.items]),
+                'is_validated': order.isValidated
+            })
+        print(f"💾 Order {order.orderId} saved.")
 

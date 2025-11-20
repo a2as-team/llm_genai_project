@@ -293,3 +293,31 @@ GET_MENU = text("""
 SELECT name,description,price,type,vegetarian
 FROM menu_items
 """)
+
+GET_INFORMATIONS = text("""
+SELECT
+  "name",
+  "address",
+  "metro",
+  "rer",
+  "parking",
+  "phone_number",
+  "website",
+  "cuisine",
+  "specialties",
+  "terrace",
+  "takeaway",
+  "delivery",
+  "child_friendly",
+  "pets_allowed",
+  "payment_methods",
+  "ambiance",
+  "accessibility",
+  "lunch_open",
+  "lunch_close",
+  "dinner_open",
+  "dinner_close",
+  "open_days"
+FROM
+  "restaurant_info";
+""")

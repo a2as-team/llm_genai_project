@@ -93,8 +93,10 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
             ),
             language_code=gemini_settings.AGENT_LANGUAGE
         ),
-        # output_audio_transcription = {},
-        # input_audio_transcription = {},
+        # Enable transcription for agent's speech output
+        output_audio_transcription=types.AudioTranscriptionConfig(),
+        # Enable transcription for user's speech input
+        input_audio_transcription=types.AudioTranscriptionConfig(),
     )
 
     # Start agent session
