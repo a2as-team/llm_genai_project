@@ -134,15 +134,15 @@ class DBManager:
         print("📋 Informations retrieved:", informations)
         return informations
     
-    async def save_order(self, order: Order):
-        """Save an order to the database."""
-        async with self.engine.begin() as conn:
-            await conn.execute(SAVE_ORDER, {
-                'order_id': str(order.orderId),
-                'customer_name': order.customerName,
-                'formules': json.dumps([formule.dict() for formule in order.formules]),
-                'items': json.dumps([item.dict() for item in order.items]),
-                'is_validated': order.isValidated
-            })
-        print(f"💾 Order {order.orderId} saved.")
+    # async def save_order(self, order: Order):
+    #     """Save an order to the database."""
+    #     async with self.engine.begin() as conn:
+    #         await conn.execute(SAVE_ORDER, {
+    #             'order_id': str(order.orderId),
+    #             'customer_name': order.customerName,
+    #             'formules': json.dumps([formule.dict() for formule in order.formules]),
+    #             'items': json.dumps([item.dict() for item in order.items]),
+    #             'is_validated': order.isValidated
+    #         })
+    #     print(f"💾 Order {order.orderId} saved.")
 

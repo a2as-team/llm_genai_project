@@ -49,6 +49,7 @@ class Reservation(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     customer_name: Mapped[str] = mapped_column(String, nullable=False)
+    customer_phone: Mapped[str] = mapped_column(String, nullable=False)
     reservation_datetime: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     number_of_guests: Mapped[int] = mapped_column(Integer, nullable=False)
     extra_infos: Mapped[str | None] = mapped_column(Text)
@@ -84,14 +85,17 @@ class MenuItem(Base):
 
     type: Mapped[str] = mapped_column(String, nullable=False)  # entrée / plat / dessert / boisson
     vegetarian: Mapped[bool] = mapped_column(Boolean, default=False)
+    halal: Mapped[bool] = mapped_column(Boolean, default=False)
+    gluten_free: Mapped[bool] = mapped_column(Boolean, default=False)
+    lactose_free: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now()
     )
 
-
-class Formule(Base):
-    __tablename__ = "formules"
+# Done
+class MenuFormule(Base):
+    __tablename__ = "menu_formules"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
@@ -106,13 +110,13 @@ class Formule(Base):
         "FormuleItem", back_populates="formule", cascade="all, delete-orphan"
     )
 
-
+# Done
 class FormuleItem(Base):
     __tablename__ = "formule_items"
 
     formule_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("formules.id", ondelete="CASCADE"),
+        ForeignKey("menu_formules.id", ondelete="CASCADE"),
         primary_key=True
     )
     item_id: Mapped[uuid.UUID] = mapped_column(
@@ -123,20 +127,16 @@ class FormuleItem(Base):
 
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
-    formule: Mapped["Formule"] = relationship("Formule", back_populates="items")
+    formule: Mapped["MenuFormule"] = relationship("MenuFormule", back_populates="items")
     item: Mapped["MenuItem"] = relationship("MenuItem")
 
-
+# Done
 class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-    reservation_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("reservations.id", ondelete="SET NULL")
-    )
     customer_name: Mapped[str | None] = mapped_column(String)
+    customer_phone: Mapped[str | None] = mapped_column(String)
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -145,8 +145,6 @@ class Order(Base):
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-
-    reservation: Mapped["Reservation"] = relationship("Reservation")
 
     formules: Mapped[list["OrderFormule"]] = relationship(
         "OrderFormule",
@@ -161,7 +159,7 @@ class Order(Base):
     )
 
 
-
+# Done
 class OrderFormule(Base):
     __tablename__ = "order_formules"
 
@@ -172,7 +170,7 @@ class OrderFormule(Base):
 
     formule_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("formules.id"),
+        ForeignKey("menu_formules.id"),
         nullable=True
     )
 
@@ -185,7 +183,7 @@ class OrderFormule(Base):
     )
 
     order: Mapped["Order"] = relationship("Order", back_populates="formules")
-    formule: Mapped["Formule"] = relationship("Formule")
+    formule: Mapped["MenuFormule"] = relationship("MenuFormule")
 
     items: Mapped[list["OrderFormuleItem"]] = relationship(
         "OrderFormuleItem",
@@ -193,6 +191,7 @@ class OrderFormule(Base):
         cascade="all, delete-orphan"
     )
 
+# Done
 class OrderFormuleItem(Base):
     __tablename__ = "order_formule_items"
 
@@ -208,14 +207,12 @@ class OrderFormuleItem(Base):
         ForeignKey("menu_items.id")
     )
 
-    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    price: Mapped[float] = mapped_column(Numeric(10,2), nullable=False)
     indications: Mapped[str | None] = mapped_column(Text)
 
     order_formule: Mapped["OrderFormule"] = relationship("OrderFormule", back_populates="items")
     item: Mapped["MenuItem"] = relationship("MenuItem")
 
-
+# Done
 class OrderItem(Base):
     __tablename__ = "order_items"
 
@@ -232,7 +229,6 @@ class OrderItem(Base):
     )
 
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    price: Mapped[float] = mapped_column(Numeric(10,2), nullable=False)
     indications: Mapped[str | None] = mapped_column(Text)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -242,6 +238,7 @@ class OrderItem(Base):
     order: Mapped["Order"] = relationship("Order", back_populates="items")
     item: Mapped["MenuItem"] = relationship("MenuItem")
 
+# Done
 class RestaurantInfo(Base):
     __tablename__ = "restaurant_info"
 
@@ -277,6 +274,7 @@ class RestaurantInfo(Base):
         TIMESTAMP(timezone=True), server_default=func.now()
     )
 
+# Done
 class RestaurantSettings(Base):
     __tablename__ = "restaurant_settings"
 
@@ -284,7 +282,7 @@ class RestaurantSettings(Base):
     average_duration_minutes: Mapped[int] = mapped_column(Integer, default=120)
     buffer_time_minutes: Mapped[int] = mapped_column(Integer, default=15)
 
-
+# Done
 class ServicePeriod(Base):
     __tablename__ = "service_periods"
 
