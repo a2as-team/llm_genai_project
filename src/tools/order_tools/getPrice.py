@@ -1,27 +1,49 @@
-import json
-from src.models import Order
+from src.utils.context import get_current_order
+from src.bdd.dbmanager import DBManager
+from logging import getLogger
 
+logger = getLogger(__name__)
 
-async def get_price(orderId: str) -> float:
+async def get_price() -> dict:
     """
-    Calculates the total price of an order.
-    Parameters:
-    - orderId: str - The ID of the order
-    Returns:
-    - total_price: float - The total price of the order
+    Calculates the estimated total price of the current order draft.
+    Fetches prices from the database based on item/formule names.
     """
-    total_price = 0.0
-
-    # Load the existing order
     try:
-        with open(f"orders/{orderId}.json", "r") as f:
-            order_data = json.load(f)
-    except FileNotFoundError:
-        print(f"Order with ID {orderId} not found.")
-        return total_price
+        order = get_current_order()
+        if not order:
+            return {"total_price": 0.0, "message": "Panier vide."}
 
-    order = Order.model_validate(order_data)
-    for order_item in order.items:
-        total_price += order_item.price * order_item.quantity
+        db_manager = DBManager()
+        total_price = 0.0
+        details = []
 
-    return total_price
+        # 1. Calculate Items Price
+        for item in order.items:
+            price = await db_manager.get_item_price(item.name)
+            
+            if price is not None:
+                item_total = price * item.quantity
+                total_price += item_total
+                details.append(f"{item.quantity}x {item.name}: {item_total:.2f}€")
+            else:
+                details.append(f"{item.quantity}x {item.name}: Prix inconnu")
+
+        # 2. Calculate Formules Price
+        for formule in order.formules:
+            price = await db_manager.get_formule_price(formule.name)
+            
+            if price is not None:
+                total_price += price
+                details.append(f"Formule {formule.name}: {price:.2f}€")
+            else:
+                details.append(f"Formule {formule.name}: Prix inconnu")
+
+        return {
+            "total_price": round(total_price, 2),
+            "details": details,
+            "currency": "EUR"
+        }
+    except Exception as e:
+        logger.error(f"Error calculating price: {e}")
+        return {"total_price": 0.0, "message": f"Erreur lors du calcul du prix: {str(e)}"}

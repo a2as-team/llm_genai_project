@@ -2,9 +2,16 @@ from google.adk.agents import LlmAgent, Agent
 from src.config import gemini_settings
 from src.prompts import ROOT_PROMPT
 from src.agents.sub_agents import booking_agent, order_agent
-from src.tools import (
-    get_menu,
-    get_informations,
+from src.tools.shared_tools import get_menu, get_informations
+from src.tools.order_tools import (
+    add_formule_to_order,
+    add_item_to_order,
+    get_price,
+    update_formule_item,
+    update_item_order,
+    validate_order,
+    remove_formule,
+    get_current_order_tool,
 )
 
 
@@ -20,5 +27,16 @@ root_agent = Agent(
     model=gemini_settings.LIVE_MODEL_NAME,
     instruction=ROOT_PROMPT,
     # sub_agents=[booking_agent, order_agent],
-    tools=[get_menu,get_informations],  
+    tools=[
+        get_menu,
+        get_informations,
+        # add_formule_to_order,
+        add_item_to_order,
+        get_price,
+        # update_formule_item,
+        # update_item_order,
+        validate_order,
+        # remove_formule,
+        get_current_order_tool,
+    ],  
 )

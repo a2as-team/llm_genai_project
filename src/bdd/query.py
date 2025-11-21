@@ -321,3 +321,30 @@ SELECT
 FROM
   "restaurant_info";
 """)
+
+GET_ITEM_PRICE = text("SELECT price FROM menu_items WHERE name = :name")
+GET_FORMULE_PRICE = text("SELECT price FROM menu_formules WHERE name = :name")
+GET_ITEM_ID_BY_NAME = text("SELECT id FROM menu_items WHERE name = :name")
+GET_FORMULE_ID_BY_NAME = text("SELECT id, price FROM menu_formules WHERE name = :name")
+
+INSERT_ORDER = text("""
+    INSERT INTO orders (id, customer_name, customer_phone, is_validated)
+    VALUES (:id, :customer_name, :customer_phone, :is_validated)
+    RETURNING id
+""")
+
+INSERT_ORDER_ITEM = text("""
+    INSERT INTO order_items (id, order_id, item_id, quantity, indications)
+    VALUES (:id, :order_id, :item_id, :quantity, :indications)
+""")
+
+INSERT_ORDER_FORMULE = text("""
+    INSERT INTO order_formules (id, order_id, formule_id, formule_name, formula_base_price, quantity)
+    VALUES (:id, :order_id, :formule_id, :formule_name, :formula_base_price, :quantity)
+    RETURNING id
+""")
+
+INSERT_ORDER_FORMULE_ITEM = text("""
+    INSERT INTO order_formule_items (id, order_formule_id, item_id, indications)
+    VALUES (:id, :order_formule_id, :item_id, :indications)
+""")

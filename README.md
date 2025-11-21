@@ -28,3 +28,9 @@ Laomedeia : Upbeat	Achernar : Soft	Alnilam : Ferme
 Schedar : Even	Gacrux : Contenu réservé aux adultes	Pulcherrima : franche
 Achird : amical	Zubenelgenubi : Décontracté	Vindemiatrix : Doux
 Sadachbia : Lively	Sadaltager : connaissances	Sulafat : chaude
+
+
+### TO DO
+
+- Faire une fonction de validation qui va utiliser un llm ou un truc de sémantique pour s'assurer que les noms d'items/Formules choisis par le modèle existe bien en db, le modèle que manipule le llm sera beaucoup plus simple
+- Faire en sorte que update item et add item et tout ty quointi ça prenne des listes

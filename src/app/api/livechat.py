@@ -22,6 +22,7 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 
 from src.agents.root_agent.rootAgent import root_agent
 from src.config import app_settings, gemini_settings, database_settings
+from src.utils.context import set_request_context, clear_request_context, init_order
 
 router = APIRouter(tags=["LiveChat"])
 logger = logging.getLogger(__name__)
@@ -32,6 +33,16 @@ db_session_service = DatabaseSessionService(
 
 async def start_agent_session(user_id: str, session_id: Optional[str] = None):
     """Starts an agent session"""
+
+    # Initialize the request context for this session (thread-safe, async-safe)
+    # This makes the session_id and user_id available to all tools via contextvars
+ # 1. Initialize context variables (ID, User)
+    set_request_context(session_id=session_id, user_id=user_id)
+    
+    # 2. CRUCIAL : Initialiser l'objet mutable (Order) ICI dans le scope parent
+    # Ainsi, le Runner et ses outils partageront tous la MEME référence à cet objet.
+    init_order()  
+    logger.info(f"Request context initialized for user={user_id}, session={session_id}")
 
     # Look for existing session (in memory OR in database)
     session = None        
@@ -111,10 +122,27 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
 
 async def agent_to_client_messaging(websocket: WebSocket, live_events):
     """Agent to client communication: Sends structured event data."""
-    print("Starting agent to client messaging")
+    print("=" * 80)
+    print("🚀 START: agent_to_client_messaging INITIALIZED")
+    print("=" * 80)
     try:
+        interaction_count = 0
         async for event in live_events:
             try:
+                # Only log meaningful events, skip audio chunks
+                if event.content and event.content.parts:
+                    has_text = any(part.text for part in event.content.parts)
+                    has_function = any(part.function_call or part.function_response for part in event.content.parts)
+                    
+                    if has_text or has_function or event.turn_complete:
+                        interaction_count += 1
+                        print("\n" + "─" * 80)
+                        print(f"📥 INTERACTION #{interaction_count} START")
+                        print(f"   Event Type: {type(event).__name__}")
+                        print(f"   Author: {event.author}")
+                        print(f"   Partial: {event.partial} | Turn Complete: {event.turn_complete}")
+                        print("─" * 80)
+                
                 logger.info(f"Received event type: {type(event)}")
                 logger.debug(f"Event details: {event}")            
                 
@@ -140,7 +168,7 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                 
                 if hasattr(event.content, "role") and event.content.role == "user":
                     if transcription_text:
-                        print(f"User transcription: {transcription_text}")
+                        print(f"   👤 User: {transcription_text}")
                         message_to_send["input_transcription"] = {
                             "text": transcription_text,
                             "is_final": not event.partial
@@ -148,7 +176,7 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                 
                 else:
                     if transcription_text:
-                        print(f"Model text response: {transcription_text}")
+                        print(f"   🤖 Agent: {transcription_text}")
                         message_to_send["output_transcription"] = {
                             "text": transcription_text,
                             "is_final": not event.partial
@@ -162,7 +190,8 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                             message_to_send["parts"].append({"type": "audio/pcm", "data": encoded_audio})
                         
                         elif part.function_call:
-                            logger.info(f"Function call: {part.function_call.name}")
+                            print(f"   🔧 Function Call: {part.function_call.name}")
+                            print(f"      Args: {part.function_call.args}")
                             message_to_send["parts"].append({
                                 "type": "function_call", 
                                 "data": {
@@ -171,15 +200,6 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                                 }
                             })
                         
-                        elif part.function_response:
-                            logger.info(f"Function response: {part.function_response.name}")
-                            message_to_send["parts"].append({
-                                "type": "function_response", 
-                                "data": {
-                                    "name": part.function_response.name, 
-                                    "response": part.function_response.response or {}
-                                }
-                            })
 
                 if (message_to_send["parts"] or 
                     message_to_send["turn_complete"] or
@@ -188,45 +208,68 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                     message_to_send["output_transcription"]):
                     
                     await websocket.send_text(json.dumps(message_to_send))
+                    
+                    if event.turn_complete:
+                        print("─" * 80)
+                        print(f"✅ INTERACTION #{interaction_count} END (Turn Complete)")
+                        print("─" * 80 + "\n")
 
             except Exception as e:
+                print(f"❌ ERROR processing event: {e}")
                 logger.error(f"Error processing event: {e}", exc_info=True)
 
     except Exception as e:
+        print("=" * 80)
+        print(f"❌ FATAL ERROR in agent_to_client_messaging: {e}")
+        print("=" * 80)
         logger.error(f"Error in agent_to_client_messaging loop: {e}", exc_info=True)
 
 async def client_to_agent_messaging(websocket: WebSocket, live_request_queue: LiveRequestQueue):
     """Client to agent communication"""
-    while True:
-        try:
-            message_json = await websocket.receive_text()
-            message = json.loads(message_json)
-            mime_type = message["mime_type"]
+    print("=" * 80)
+    print("🚀 START: client_to_agent_messaging INITIALIZED")
+    print("=" * 80)
+    message_count = 0
+    try:
+        while True:
+            try:
+                message_json = await websocket.receive_text()
+                message = json.loads(message_json)
+                mime_type = message["mime_type"]
+                message_count += 1
 
-            if mime_type == "text/plain":
-                data = message["data"]
-                content = Content(role="user", parts=[Part.from_text(text=data)])
-                live_request_queue.send_content(content=content)
+                if mime_type == "text/plain":
+                    data = message["data"]
+                    print(f"\n📤 CLIENT MESSAGE #{message_count} (text/plain)")
+                    print(f"   Content: {data}")
+                    content = Content(role="user", parts=[Part.from_text(text=data)])
+                    live_request_queue.send_content(content=content)
+                    print(f"✅ Sent to agent queue")
 
-            elif mime_type == "audio/pcm":
-                data = message["data"]
-                decoded_data = base64.b64decode(data)
-                live_request_queue.send_realtime(Blob(data=decoded_data, mime_type=mime_type))
+                elif mime_type == "audio/pcm":
+                    data = message["data"]
+                    decoded_data = base64.b64decode(data)
+                    live_request_queue.send_realtime(Blob(data=decoded_data, mime_type=mime_type))
+                    
+                else:
+                    print(f"\n⚠️  UNSUPPORTED MIME TYPE: {mime_type}")
+                    logger.warning(f"Mime type not supported: {mime_type}")
 
-            elif mime_type == "image/jpeg":
-                data = message["data"]
-                decoded_data = base64.b64decode(data)
-                live_request_queue.send_realtime(Blob(data=decoded_data, mime_type=mime_type))
-                
-            else:
-                logger.warning(f"Mime type not supported: {mime_type}")
+            except WebSocketDisconnect:
+                print("\n" + "=" * 80)
+                print("🔴 Client disconnected (WebSocketDisconnect)")
+                print("=" * 80)
+                logger.info("Client disconnected (WebSocketDisconnect).")
+                break
 
-        except WebSocketDisconnect:
-            logger.info("Client disconnected (WebSocketDisconnect).")
-            break
-
-        except Exception as e:
-            logger.error(f"An error occurred in client_to_agent_messaging: {e}")
+            except Exception as e:
+                print(f"\n❌ ERROR in client_to_agent_messaging: {e}")
+                logger.error(f"An error occurred in client_to_agent_messaging: {e}")
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌ FATAL ERROR in client_to_agent_messaging loop: {e}")
+        print("=" * 80)
+        logger.error(f"Fatal error in client_to_agent_messaging: {e}")
 
 
 @router.websocket("/ws/{user_id}")
@@ -238,17 +281,23 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: Opt
 
     # Start agent session
     user_id_str = str(user_id)
-    print(user_id_str)
+    print("\n" + "=" * 80)
+    print(f"🔗 NEW WEBSOCKET CONNECTION")
+    print(f"   User ID: {user_id_str}")
+    print(f"   Session ID: {session_id}")
+    print("=" * 80)
+    
     live_events, live_request_queue, session_id = await start_agent_session(user_id_str, session_id)
     
     # Send session ID to client
     await websocket.send_text(json.dumps({
         "session_id": session_id
     }))
+    print(f"✅ Session initialized: {session_id}\n")
 
     #debug
     if live_events and live_request_queue:
-        print("live etvents and live request queue created")
+        print("✅ Live events and live request queue created\n")
 
     # Start tasks
     agent_to_client_task = asyncio.create_task(
@@ -264,4 +313,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: Opt
 
     # Close LiveRequestQueue
     live_request_queue.close()
-    print(f"Client #{user_id} disconnected")
+    
+    # Clear the request context to avoid leaks
+    clear_request_context()
+    logger.info(f"Request context cleared for user {user_id}")
+    
+    print("\n" + "=" * 80)
+    print(f"🔌 CONNECTION CLOSED")
+    print(f"   User ID: {user_id}")
+    print(f"   Session ID: {session_id}")
+    print("=" * 80 + "\n")

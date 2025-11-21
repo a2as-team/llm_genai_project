@@ -3,11 +3,9 @@ from src.config import gemini_settings
 from src.prompts import ORDER_PROMPT
 from src.tools import (
     add_item_to_order,
-    create_order,
     get_menu,
     validate_order,
     get_price,
-    get_current_order,
     update_item_order,
     add_formule_to_order,
     update_formule_item,
@@ -19,7 +17,6 @@ order_agent = Agent(
     model=gemini_settings.LIVE_MODEL_NAME,
     instruction=ORDER_PROMPT,
     tools=[
-        create_order,
         add_item_to_order,
         add_formule_to_order,
         update_formule_item,
@@ -27,7 +24,6 @@ order_agent = Agent(
         get_menu,
         validate_order,
         get_price,
-        get_current_order,
         update_item_order,
     ],
 )

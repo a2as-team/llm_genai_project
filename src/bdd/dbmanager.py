@@ -134,15 +134,93 @@ class DBManager:
         print("📋 Informations retrieved:", informations)
         return informations
     
-    # async def save_order(self, order: Order):
-    #     """Save an order to the database."""
-    #     async with self.engine.begin() as conn:
-    #         await conn.execute(SAVE_ORDER, {
-    #             'order_id': str(order.orderId),
-    #             'customer_name': order.customerName,
-    #             'formules': json.dumps([formule.dict() for formule in order.formules]),
-    #             'items': json.dumps([item.dict() for item in order.items]),
-    #             'is_validated': order.isValidated
-    #         })
-    #     print(f"💾 Order {order.orderId} saved.")
+    async def get_item_price(self, name: str) -> Optional[float]:
+        """Get price of a menu item by name."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_ITEM_PRICE, {"name": name})
+            row = result.fetchone()
+            return float(row[0]) if row else None
+
+    async def get_formule_price(self, name: str) -> Optional[float]:
+        """Get price of a menu formule by name."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_FORMULE_PRICE, {"name": name})
+            row = result.fetchone()
+            return float(row[0]) if row else None
+
+    async def save_full_order(self, draft_order, customer_name: str, customer_phone: str) -> str:
+        """
+        Save a complete order to the database manually generating UUIDs.
+        """
+        # 1. Générer l'ID de la commande principale
+        new_order_id = uuid4()
+
+        async with self.engine.begin() as conn:
+            # --- INSERTION COMMANDE ---
+            await conn.execute(INSERT_ORDER, {
+                "id": new_order_id,
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+                "is_validated": True
+            })
+            
+            # --- INSERTION ITEMS INDIVIDUELS ---
+            for item in draft_order.items:
+                # Récupération de l'ID du produit (Menu Item)
+                res_item = await conn.execute(GET_ITEM_ID_BY_NAME, {"name": item.name})
+                item_id_row = res_item.fetchone()
+                if not item_id_row:
+                    raise ValueError(f"Article inconnu: {item.name}")
+                item_db_id = item_id_row[0]
+
+                # Génération ID pour la ligne de commande
+                order_item_uuid = uuid4()
+
+                await conn.execute(INSERT_ORDER_ITEM, {
+                    "id": order_item_uuid, # <--- Ici
+                    "order_id": new_order_id,
+                    "item_id": item_db_id,
+                    "quantity": item.quantity,
+                    "indications": item.indications
+                })
+
+            # --- INSERTION FORMULES ---
+            for formule in draft_order.formules:
+                res_formule = await conn.execute(GET_FORMULE_ID_BY_NAME, {"name": formule.name})
+                formule_row = res_formule.fetchone()
+                if not formule_row:
+                    raise ValueError(f"Formule inconnue: {formule.name}")
+                formule_db_id, formule_price = formule_row
+
+                # Génération ID pour la ligne de formule
+                order_formule_uuid = uuid4()
+
+                await conn.execute(INSERT_ORDER_FORMULE, {
+                    "id": order_formule_uuid, # <--- Ici
+                    "order_id": new_order_id,
+                    "formule_id": formule_db_id,
+                    "formule_name": formule.name,
+                    "formula_base_price": formule_price,
+                    "quantity": 1
+                })
+
+                # --- INSERTION ITEMS DANS LA FORMULE ---
+                for f_item in formule.items:
+                    res_f_item = await conn.execute(GET_ITEM_ID_BY_NAME, {"name": f_item.item_name})
+                    f_item_row = res_f_item.fetchone()
+                    if not f_item_row:
+                        raise ValueError(f"Article de formule inconnu: {f_item.item_name}")
+                    f_item_db_id = f_item_row[0]
+
+                    # Génération ID pour la ligne d'item de formule
+                    order_formule_item_uuid = uuid4()
+
+                    await conn.execute(INSERT_ORDER_FORMULE_ITEM, {
+                        "id": order_formule_item_uuid, # <--- Ici
+                        "order_formule_id": order_formule_uuid, # Lien avec la formule créée juste avant
+                        "item_id": f_item_db_id,
+                        "indications": f_item.indications
+                    })
+
+            return str(new_order_id)
 

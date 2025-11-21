@@ -1,117 +1,52 @@
-import json
-import pandas as pd
-from pydantic import BaseModel
-from src.models import Order
 from typing import List, Optional
-
+from pydantic import BaseModel
+from src.utils.context import get_or_create_order, get_current_order
+from src.models.order_draft import DraftOrderItem
 
 class AddItemRequest(BaseModel):
-    itemId: str
-    quantity: int
+    itemName: str
+    quantity: int = 1
     indications: Optional[str] = None
 
-
-def get_price_from_db(item_id: str) -> Optional[float]:
-    """Retrieve price from db.csv based on item ID."""
-    try:
-        df = pd.read_csv("db.csv")
-        row = df[df["id"] == item_id]
-        if not row.empty:
-            return float(row.iloc[0]["prix"])
-    except Exception as e:
-        print(f"Error reading price from db.csv: {e}")
-    return None
-
-
-async def add_item_to_order(
-    orderId: str,
-    items: List[AddItemRequest],
-) -> dict:
+async def add_item_to_order(item: AddItemRequest) -> dict:
     """
-    Adds one or multiple items to an existing order.
+    Adds a single item to the current order draft.
+    
     Parameters:
-    - orderId: str - The ID of the order to which items will be added
-    - items: List[AddItemRequest] - List of items to add, each containing:
-        - itemId: str - The ID of the item
-        - quantity: int - The quantity to add
-        - indications: Optional[str] - Optional indications (e.g., "sans oignons")
-    Returns:
-    - dict - Result with status, added count, and updated items
+    - item: AddItemRequest - The item to add.
+
+    class AddItemRequest(BaseModel):
+        itemName: str
+        quantity: int = 1
+        indications: Optional[str] = None
     """
-    result = {
-        "success": False,
-        "added_count": 0,
-        "updated_count": 0,
-        "items": [],
-        "message": "",
-    }
+    # Récupération de la commande (supposons que c'est synchrone ici selon ton code)
+    order = get_or_create_order()
+    
+    # Gestion défensive (dict vs objet)
+    item_req = item if isinstance(item, AddItemRequest) else AddItemRequest(**item)
 
-    # Load the existing order
-    try:
-        with open(f"orders/{orderId}.json", "r") as f:
-            order_data = json.load(f)
-        order = Order.model_validate(order_data)
-        if order.isValidated:
-            result["message"] = (
-                f"Order {orderId} is already validated. Cannot add items."
-            )
-            return result
-    except FileNotFoundError:
-        result["message"] = f"Order with ID {orderId} not found."
-        return result
+    # Recherche d'un article existant (Même nom ET mêmes indications)
+    # On utilise item_req.itemName pour mapper vers DraftOrderItem.name
+    existing = next(
+        (i for i in order.items if i.name == item_req.itemName and i.indications == item_req.indications), 
+        None
+    )
 
-    # Process each item
-    for item_data in items:
-        # Convert dict to AddItemRequest object if needed
-        if isinstance(item_data, dict):
-            item_request = AddItemRequest.model_validate(item_data)
-        else:
-            item_request = item_data
-
-        # Get price from database
-        price = get_price_from_db(item_request.itemId)
-        if price is None:
-            result["message"] = (
-                f"Item with ID {item_request.itemId} not found in database."
-            )
-            continue
-
-        existing_item = None
-
-        # Check if item already exists in order (matching itemId AND indications)
-        for order_item in order.items:
-            if (
-                order_item.itemId == item_request.itemId
-                and order_item.indications == item_request.indications
-            ):
-                existing_item = order_item
-                break
-
-        if existing_item:
-            # Update existing item quantity
-            existing_item.quantity += item_request.quantity
-            result["updated_count"] += 1
-        else:
-            # Add new item to order
-            new_item = Item(
-                itemId=item_request.itemId,
-                quantity=item_request.quantity,
-                price=price,
-                indications=item_request.indications,
-            )
-            order.items.append(new_item)
-            result["added_count"] += 1
-
-    # Save the updated order
-    try:
-        with open(f"orders/{orderId}.json", "w") as f:
-            json.dump(order.model_dump(), f, indent=2)
-        result["success"] = True
-        result["items"] = [item.model_dump() for item in order.items]
-        result["message"] = (
-            f"Successfully added {result['added_count']} new items and updated {result['updated_count']} existing items."
+    if existing:
+        # On incrémente seulement si ça existe déjà
+        existing.quantity += item_req.quantity
+    else:
+        # Sinon on crée la nouvelle ligne
+        new_item = DraftOrderItem(
+            name=item_req.itemName, 
+            quantity=item_req.quantity, 
+            indications=item_req.indications
         )
-    except Exception as e:
-        result["message"] = f"Error saving order: {str(e)}"
-
-    return result
+        order.items.append(new_item)
+        
+    return {
+        "success": True, 
+        "message": f"{item_req.quantity} article(s) ajouté(s) au panier.", 
+        "current_items": [i.model_dump() for i in order.items]
+    }

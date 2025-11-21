@@ -1,40 +1,33 @@
-import json
-from src.models import Order
+from src.utils.context import get_current_order, clear_request_context
+from src.bdd.dbmanager import DBManager
+from logging import getLogger
 
+logger = getLogger(__name__)
 
-async def validate_order(orderId: str, customerName: str) -> bool:
+async def validate_order(customerName: str, customerPhone: str = "") -> dict:
     """
-    Validates an existing order.
-    Parameters:
-    - orderId: str - The ID of the order to validate
-    Returns:
-    - isValidated: bool - True if the order was validated successfully, False otherwise
+    Validates the current order draft and persists it to the database.
     """
-    isValidated = False
-
-    # Load the existing order
     try:
-        with open(f"orders/{orderId}.json", "r") as f:
-            order_data = json.load(f)
-        order = Order.model_validate(order_data)
-        if order.isValidated:
-            print(f"Order with ID {orderId} is already validated.")
-            return isValidated
-    except FileNotFoundError:
-        print(f"Order with ID {orderId} not found.")
-        return isValidated
+        draft_order = get_current_order()
+        if not draft_order:
+            return {"success": False, "message": "Aucune commande à valider."}
 
-    # Validate the order - check that it has either formules or items
-    if not order.formules and not order.items:
-        print(f"Order with ID {orderId} is empty. Cannot validate.")
-        return isValidated
+        if not draft_order.items and not draft_order.formules:
+            return {"success": False, "message": "Le panier est vide."}
 
-    order.customerName = customerName
-    order.isValidated = True
-    isValidated = True
+        db_manager = DBManager()
+        
+        await db_manager.save_full_order(draft_order, customerName, customerPhone)
 
-    # Save the updated order
-    with open(f"orders/{orderId}.json", "w") as f:
-        json.dump(order.model_dump(), f)
+        return {
+            "success": True, 
+            "message": "Commande validée avec succès!",
+        }
 
-    return isValidated
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        return {"success": False, "message": f"Erreur de validation: {str(e)}"}
+    except Exception as e:
+        logger.error(f"Technical error during validation: {e}")
+        return {"success": False, "message": f"Erreur technique lors de la validation: {str(e)}"}
