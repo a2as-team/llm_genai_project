@@ -34,7 +34,7 @@ root_agent = Agent(
         add_item_to_order,
         get_price,
         # update_formule_item,
-        # update_item_order,
+        update_item_order,
         validate_order,
         # remove_formule,
         get_current_order_tool,

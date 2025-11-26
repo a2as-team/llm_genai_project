@@ -1,81 +1,136 @@
-from typing import List, Optional, Literal
+from typing import Optional, Literal
 from pydantic import BaseModel
 from src.utils.context import get_or_create_order
+from src.tools.order_tools.addItemToOrder import AddItemRequest
 
 class UpdateItemRequest(BaseModel):
+    # Pour identifier l'item dans la commande (DOIT correspondre exactement à ce qui est dans la commande)
     itemName: str
-    quantity: Optional[int] = None
-    indications: Optional[str] = None
-    new_indications: Optional[str] = None
-    action: Literal["update", "remove", "replace"] = "update"  # "update", "remove", or "replace"
+    
+    # Pour les modifications
+    newQuantity: Optional[int] = None
+    newIndications: Optional[str] = None
+    newItem: Optional[AddItemRequest] = None  # Pour action "replace"
+    
+    action: Literal["update", "delete", "replace"] = "update"
 
-async def update_item_order(updates: List[UpdateItemRequest]) -> dict:
+async def update_item_order(update: UpdateItemRequest) -> dict:
     """
-    Updates, removes, or replaces items in the current order draft.
-
+    Updates, deletes, or replaces a single item in the current order draft.
+    
+    IMPORTANT: itemName doit correspondre EXACTEMENT à ce qui est présent dans la commande actuelle.
+    
+    Parameters:
+    - update: UpdateItemRequest
+    
     class UpdateItemRequest(BaseModel):
+        # Identification de l'item (EXACTEMENT comme dans la commande actuelle)
+        itemName: str                          # Nom exact de l'item à modifier
+        
+        # Modifications à appliquer
+        newQuantity: Optional[int] = None      # Nouvelle quantité (pour action "update")
+        newIndications: Optional[str] = None   # Nouvelles indications (pour action "update")
+        newItem: Optional[AddItemRequest] = None  # Nouvel item complet (pour action "replace")
+        
+        action: Literal["update", "delete", "replace"] = "update"
+        
+    Actions:
+    - "update": Modifie quantity et/ou indications de l'item existant
+    - "delete": Supprime l'item de la commande
+    - "replace": Remplace l'item par newItem (un AddItemRequest complet)
+    
+    class AddItemRequest(BaseModel):
         itemName: str
-        quantity: Optional[int] = None
+        quantity: int = 1
         indications: Optional[str] = None
-        new_indications: Optional[str] = None
-        action: Literal["update", "remove", "replace"] = "update"
     """
     order = get_or_create_order()
-    result = {
-        "success": True,
-        "updates_performed": [],
-        "errors": []
+    
+    # Gestion défensive (dict vs objet)
+    req = update if isinstance(update, UpdateItemRequest) else UpdateItemRequest(**update)
+    
+    # Trouver l'item par nom ET indications exactes
+    found_index = -1
+    for i, item in enumerate(order.items):
+        if item.name == req.itemName :
+            found_index = i
+            break
+    
+    if found_index == -1:
+        return {
+            "success": False,
+            "message": f"Article '{req.itemName}' non trouvé dans la commande.",
+            "current_items": [i.model_dump() for i in order.items]
+        }
+
+    item = order.items[found_index]
+
+    # ACTION: DELETE
+    if req.action == "delete":
+        removed = order.items.pop(found_index)
+        return {
+            "success": True,
+            "message": f"Article '{removed.name}' supprimé du panier.",
+            "current_items": [i.model_dump() for i in order.items]
+        }
+
+    # ACTION: UPDATE
+    elif req.action == "update":
+        changes = []
+        
+        if req.newQuantity is not None:
+            if req.newQuantity > 0:
+                item.quantity = req.newQuantity
+                changes.append(f"quantité → {req.newQuantity}")
+            else:
+                return {
+                    "success": False,
+                    "message": f"Quantité invalide ({req.newQuantity}). Utilisez action 'delete' pour supprimer.",
+                    "current_items": [i.model_dump() for i in order.items]
+                }
+        
+        if req.newIndications is not None:
+            item.indications = req.newIndications
+            changes.append(f"indications → '{req.newIndications}'")
+        
+        if not changes:
+            return {
+                "success": False,
+                "message": "Aucune modification spécifiée (newQuantity ou newIndications requis).",
+                "current_items": [i.model_dump() for i in order.items]
+            }
+        
+        return {
+            "success": True,
+            "message": f"Article '{item.name}' mis à jour: {', '.join(changes)}.",
+            "current_items": [i.model_dump() for i in order.items]
+        }
+
+    # ACTION: REPLACE
+    elif req.action == "replace":
+        if req.newItem is None:
+            return {
+                "success": False,
+                "message": "newItem requis pour l'action 'replace'.",
+                "current_items": [i.model_dump() for i in order.items]
+            }
+        
+        # Gestion défensive pour newItem
+        new_item_req = req.newItem if isinstance(req.newItem, AddItemRequest) else AddItemRequest(**req.newItem)
+        
+        # Remplacer l'item
+        item.name = new_item_req.itemName
+        item.quantity = new_item_req.quantity
+        item.indications = new_item_req.indications
+        
+        return {
+            "success": True,
+            "message": f"Article remplacé par '{new_item_req.itemName}' (qty: {new_item_req.quantity}).",
+            "current_items": [i.model_dump() for i in order.items]
+        }
+    
+    return {
+        "success": False,
+        "message": f"Action inconnue '{req.action}'.",
+        "current_items": [i.model_dump() for i in order.items]
     }
-
-    for update in updates:
-        # Find item by name and indications
-        # We iterate backwards to safely remove if needed, or just find first match
-        # For simplicity, let's find the first match
-        found_index = -1
-        for i, item in enumerate(order.items):
-            if item.name == update.itemName and item.indications == update.indications:
-                found_index = i
-                break
-        
-        if found_index == -1:
-            result["errors"].append(f"Article '{update.itemName}' avec indications '{update.indications}' non trouvé.")
-            continue
-
-        item = order.items[found_index]
-
-        if update.action == "update":
-            if update.quantity is not None and update.quantity > 0:
-                item.quantity = update.quantity
-                result["updates_performed"].append(f"Quantité de '{item.name}' mise à jour à {item.quantity}.")
-            else:
-                result["errors"].append(f"Quantité invalide pour '{item.name}'.")
-
-        elif update.action == "remove":
-            removed = order.items.pop(found_index)
-            result["updates_performed"].append(f"Article '{removed.name}' retiré.")
-
-        elif update.action == "replace":
-            if update.new_indications is not None:
-                # Check if target variant exists to merge
-                existing_variant_index = -1
-                for i, existing in enumerate(order.items):
-                    if i != found_index and existing.name == item.name and existing.indications == update.new_indications:
-                        existing_variant_index = i
-                        break
-                
-                if existing_variant_index != -1:
-                    # Merge
-                    order.items[existing_variant_index].quantity += item.quantity
-                    order.items.pop(found_index)
-                    result["updates_performed"].append(f"Article '{item.name}' fusionné avec la variante existante.")
-                else:
-                    # Update indications
-                    item.indications = update.new_indications
-                    result["updates_performed"].append(f"Indications de '{item.name}' modifiées en '{update.new_indications}'.")
-            else:
-                result["errors"].append(f"Nouvelles indications manquantes pour '{item.name}'.")
-        
-        else:
-            result["errors"].append(f"Action inconnue '{update.action}' pour '{item.name}'.")
-
-    return result

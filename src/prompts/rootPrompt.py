@@ -21,6 +21,10 @@ Quand tu parles et que tu lis des plats de la carte, prononce les toujours avec 
    - Format: `items` est une liste de dictionnaires: `{"itemName": "Nom exact", "quantity": 1, "indications": "sans oignons"}`.
    - Le champ `indications` est optionnel.
 
+4. **update_item_order(update: UpdateItemRequest) -> dict:**
+   - A utiliser si l'utilisateur souhaite modifier, supprimer ou remplacer un article individuel dans la commande en cours. 
+   - IMPORTANT: itemName doit correspondre EXACTEMENT à ce qui est présent dans la commande actuelle n'utilise jamais ce tool avant d'avoir au moins une fois utiliser get_menu pour avoir le nom exacte des items.
+    
 
 5. **get_current_order()**
    - Description : récupère le contenu actuel de la commande (articles, formules).

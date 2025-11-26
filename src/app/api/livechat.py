@@ -28,7 +28,7 @@ router = APIRouter(tags=["LiveChat"])
 logger = logging.getLogger(__name__)
 
 db_session_service = DatabaseSessionService(
-    db_url=database_settings.dsn,
+    db_url=database_settings.dsn
 )
 
 async def start_agent_session(user_id: str, session_id: Optional[str] = None):
@@ -47,7 +47,7 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
     # Look for existing session (in memory OR in database)
     session = None        
     if session_id:
-
+        
         session = await db_session_service.get_session(
             app_name=app_settings.APP_NAME, user_id=user_id, session_id=session_id
         )
