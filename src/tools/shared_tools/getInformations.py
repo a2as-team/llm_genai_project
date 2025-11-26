@@ -15,6 +15,7 @@ async def get_informations()->str:
             info_retour += f"- {info}\n"
         return info_retour
 
+                    
 
     except Exception as e:
         logger.error(f"Error getting informations: {e}")

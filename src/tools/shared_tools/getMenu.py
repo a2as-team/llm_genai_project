@@ -9,10 +9,13 @@ async def get_menu()->str:
     """
     try:
         db_manager = DBManager()
-        menu_items = await db_manager.get_menu()
-        menu="""Menu:\n"""
+        menu_items, menu_formules = await db_manager.get_menu()
+        menu="""Menu:\nItems Uniques:\n"""
         for item in menu_items:
             menu += f"- {item}\n"
+        menu += "Formules:\n"
+        for formule in menu_formules:
+            menu += f"- {formule}\n"
         return menu
 
 

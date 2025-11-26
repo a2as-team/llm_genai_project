@@ -289,9 +289,14 @@ VALUES (
 );
 """)
 
-GET_MENU = text("""
+GET_MENU_ITEMS = text("""
 SELECT name,description,price,type,vegetarian
 FROM menu_items
+""")
+
+GET_FORMULE_ITEMS = text("""
+SELECT name,price,description
+FROM menu_formules
 """)
 
 GET_INFORMATIONS = text("""

@@ -121,10 +121,12 @@ class DBManager:
     async def get_menu(self):
         """Retrieve the menu from the database."""
         async with self.engine.begin() as conn:
-            result = await conn.execute(GET_MENU)
-            menu_items = result.fetchall()
-        print("📋 Menu retrieved:", menu_items)
-        return menu_items
+            result_items = await conn.execute(GET_MENU_ITEMS)
+            result_formules = await conn.execute(GET_FORMULE_ITEMS)
+            menu_items = result_items.fetchall()
+            menu_formules = result_formules.fetchall()
+        print("📋 Menu retrieved:", menu_items, menu_formules)
+        return menu_items, menu_formules
     
     async def get_informations(self):
         """Retrieve the informations of the restaurant from the database."""
