@@ -15,7 +15,7 @@ class DraftFormuleItem(BaseModel):
 
 class DraftOrderFormule(BaseModel):
     """Represents a selected formula (e.g., Menu Duo)."""
-    name: str
+    name: str 
     items: List[DraftFormuleItem] = Field(default_factory=list)
 
 class DraftOrder(BaseModel):
@@ -28,6 +28,8 @@ class DraftOrder(BaseModel):
     
     items: List[DraftOrderItem] = Field(default_factory=list)
     formules: List[DraftOrderFormule] = Field(default_factory=list)
+
+    error_message:str | None = None
 
     def total_item_count(self) -> int:
         return sum(item.quantity for item in self.items) + len(self.formules)
