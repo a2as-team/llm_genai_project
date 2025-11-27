@@ -7,7 +7,6 @@ from src.tools.order_tools import (
     add_formule_to_order,
     add_item_to_order,
     get_price,
-    update_formule_item,
     update_item_order,
     validate_order,
     remove_formule,
@@ -30,13 +29,12 @@ root_agent = Agent(
     tools=[
         get_menu,
         get_informations,
-        # add_formule_to_order,
+        add_formule_to_order,
         add_item_to_order,
         get_price,
-        # update_formule_item,
+        remove_formule,
         update_item_order,
         validate_order,
-        # remove_formule,
         get_current_order_tool,
     ],  
 )

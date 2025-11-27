@@ -6,7 +6,6 @@ from .order_tools import (
     validate_order,
     update_item_order,
     add_formule_to_order,
-    update_formule_item,
     remove_formule,
 )
 
@@ -19,6 +18,5 @@ __all__ = [
     "get_informations",
     "update_item_order",
     "add_formule_to_order",
-    "update_formule_item",
     "remove_formule",
 ]

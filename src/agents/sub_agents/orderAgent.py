@@ -8,7 +8,6 @@ from src.tools import (
     get_price,
     update_item_order,
     add_formule_to_order,
-    update_formule_item,
     remove_formule,
 )
 
@@ -19,7 +18,6 @@ order_agent = Agent(
     tools=[
         add_item_to_order,
         add_formule_to_order,
-        update_formule_item,
         remove_formule,
         get_menu,
         validate_order,
