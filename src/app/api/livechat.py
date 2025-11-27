@@ -41,7 +41,6 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
     
     # 2. CRUCIAL : Initialiser l'objet mutable (Order) ICI dans le scope parent
     # Ainsi, le Runner et ses outils partageront tous la MEME référence à cet objet.
-    init_order()  
     logger.info(f"Request context initialized for user={user_id}, session={session_id}")
 
     # Look for existing session (in memory OR in database)
@@ -89,7 +88,7 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
         streaming_mode=StreamingMode.BIDI,
         realtime_input_config=types.RealtimeInputConfig(
             automatic_activity_detection=types.AutomaticActivityDetection(
-                start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW,
+                start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
                 end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
                 prefix_padding_ms=100,
                 silence_duration_ms=200,
