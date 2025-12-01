@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Ajouter le répertoire courant au path
+sys.path.insert(0, str(Path(__file__).parent))
+
 from src.config import GeminiSettings
 
 settings = GeminiSettings()

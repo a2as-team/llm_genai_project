@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "llm-genai-project"
 version = "0.1.0"
@@ -10,4 +14,24 @@ dependencies = [
     "pandas>=2.3.3",
     "pydantic>=2.12.4",
     "pydantic-settings>=2.12.0",
+    "asyncpg>=0.30.0",
+    "fastapi[all]>=0.118.0",
+    "psycopg2-binary>=2.9.11",
+    "sqlalchemy>=2.0.43",
+    "ortools>=9.14.6206",
 ]
+
+[tool.uv]
+dev-dependencies = [
+    "dotenv>=0.9.9",
+    "ipykernel>=6.30.1",
+    "tqdm>=4.67.1",
+]
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[project.scripts]
+dev  = "src.app.main:dev_server"
+prod = "src.app.main:prod_server"

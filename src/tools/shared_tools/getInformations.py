@@ -1,31 +1,22 @@
-RESTAURANT_PROFILE = {
-    "name": "Pizza Royal",
-    "address": "2 bis Avenue Foch, 75016 Paris",
-    "metro": "Étoile (lignes 1, 2, 6)",
-    "rer": "Charles de Gaulle - Étoile (RER A)",
-    "parking": "Parking Vinci Park à 100m, Avenue Foch",
-    "phone_number": "+33 1 45 23 98 76",
-    "website": "https://pizzaroyal.fr",
-    "opening_hours": {
-        "lunch": "11h30 - 14h30",
-        "dinner": "18h30 - 23h00",
-        "open_days": "Tous les jours"
-    },
-    "cuisine": "Italienne et pizzeria traditionnelle",
-    "specialties": [
-        "Pizza Regina au feu de bois",
-        "Burrata crémeuse",
-        "Tiramisu maison"
-    ],
-    "terrace": True,
-    "takeaway": True,
-    "delivery": True,
-    "child_friendly": True,
-    "pets_allowed": False,
-    "payment_methods": ["Carte bancaire", "Espèces", "Tickets restaurant"],
-    "ambiance": "Chaleureuse, idéale pour un dîner entre amis ou en famille",
-    "accessibility": "Accessible aux personnes à mobilité réduite"
-}
+from src.bdd import DBManager
+from logging import getLogger
 
-async def get_informations() -> dict:
-    return RESTAURANT_PROFILE
+logger = getLogger(__name__)
+
+async def get_informations()->str:
+    """
+    Return the complete informations of the restaurant such as location, opening hours, rules, website and all of these kind of infos.
+    """
+    try:
+        db_manager = DBManager()
+        informations = await db_manager.get_informations()
+        info_retour="""Informations:\n"""
+        for info in informations:
+            info_retour += f"- {info}\n"
+        return info_retour
+
+                    
+
+    except Exception as e:
+        logger.error(f"Error getting informations: {e}")
+        return f"Error getting informations: {str(e)}"
