@@ -1,9 +1,11 @@
 from google.adk.agents import Agent
 from src.config import gemini_settings
 from src.prompts import ROOT_PROMPT
-from src.tools.shared_tools import get_menu, get_informations
-from src.tools.order_tools import (
+from src.tools import (
+    get_menu,
+    get_informations,
     validate_order,
+    validate_booking,
 )
 
 root_agent = Agent(
@@ -14,5 +16,6 @@ root_agent = Agent(
         get_menu,
         get_informations,
         validate_order,
+        validate_booking,
     ],  
 )

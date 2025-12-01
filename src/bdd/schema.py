@@ -281,13 +281,5 @@ class RestaurantSettings(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     average_duration_minutes: Mapped[int] = mapped_column(Integer, default=120)
     buffer_time_minutes: Mapped[int] = mapped_column(Integer, default=15)
-
-# Done
-class ServicePeriod(Base):
-    __tablename__ = "service_periods"
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String)  # lunch/dinner
-    opening_hour: Mapped[str] = mapped_column(String)
-    closing_hour: Mapped[str] = mapped_column(String)
+    reservation_time_slot: Mapped[int] = mapped_column(Integer, default=15)
 

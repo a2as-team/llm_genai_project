@@ -1,11 +1,11 @@
-from .booking import Table,Reservation,ServicePeriod,RestaurantSettings,GetTableAvailabilityRequest
-from .order_draft import DraftOrder, DraftOrderItem,DraftOrderFormule,DraftFormuleItem
+from .booking import BookingRequest, BookingResponse, TableInfo, AlternativeSlot
+from .order_draft import DraftOrder, DraftOrderItem, DraftOrderFormule, DraftFormuleItem
+
 __all__ = [
-    "Table",
-    "Reservation",
-    "ServicePeriod",
-    "RestaurantSettings",
-    "GetTableAvailabilityRequest",
+    "BookingRequest",
+    "BookingResponse",
+    "TableInfo",
+    "AlternativeSlot",
     "DraftOrder",
     "DraftOrderItem",
     "DraftOrderFormule",
