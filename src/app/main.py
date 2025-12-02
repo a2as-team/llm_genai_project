@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.app.api import api_router
 from src.config import app_settings
 from src.bdd.get_db_url import create_db_pool
+from src.utils.restaurant_cache import RestaurantCache
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def on_startup():
-        """Initialize database connection on application startup."""
+        """Initialize database connection and caches on application startup."""
         logger.info("Starting FastAPI application...")
 
         if os.getenv("SKIP_DB_INIT", "false").lower() == "true":
@@ -70,6 +71,10 @@ def create_app() -> FastAPI:
                 create_db_pool(), timeout=timeout
             )
             logger.info("Database pool initialized and ready.")
+            
+            # Initialize restaurant cache (hours, capacity)
+            await RestaurantCache.initialize()
+            logger.info("Restaurant cache initialized.")
         except Exception as e:
             logger.exception("DB init failed; starting without DB.")
             app.state.db_pool = None

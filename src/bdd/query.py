@@ -243,6 +243,7 @@ INSERT INTO restaurant_info (
     lunch_close,
     dinner_open,
     dinner_close,
+    max_resa,
     open_days
 )
 VALUES (
@@ -268,6 +269,7 @@ VALUES (
     '14h30',
     '18h30',
     '23h00',
+    10,
     'Tous les jours'
 );
 """)
@@ -275,10 +277,12 @@ VALUES (
 POPULATE_RESTAURANT_SETTINGS = text("""
 INSERT INTO restaurant_settings (
     average_duration_minutes,
-    buffer_time_minutes
+    buffer_time_minutes,
+    reservation_time_slot
 )
 VALUES (
     120,
+    15,
     15
 );
 """)
@@ -346,4 +350,65 @@ INSERT_ORDER_FORMULE = text("""
 INSERT_ORDER_FORMULE_ITEM = text("""
     INSERT INTO order_formule_items (id, order_formule_id, item_id, indications)
     VALUES (:id, :order_formule_id, :item_id, :indications)
+""")
+
+# =============================================================================
+# BOOKING / RESERVATION QUERIES
+# =============================================================================
+
+GET_ALL_TABLES = text("""
+    SELECT id, name, capacity, location
+    FROM tables
+    ORDER BY capacity ASC
+""")
+
+GET_TABLES_BY_LOCATION = text("""
+    SELECT id, name, capacity, location
+    FROM tables
+    WHERE location = :location
+    ORDER BY capacity ASC
+""")
+
+GET_TABLE_COMBINATIONS = text("""
+    SELECT table_id, combinable_with
+    FROM table_combinations
+""")
+
+GET_RESTAURANT_SETTINGS = text("""
+    SELECT average_duration_minutes, buffer_time_minutes, reservation_time_slot
+    FROM restaurant_settings
+    LIMIT 1
+""")
+
+GET_RESTAURANT_HOURS = text("""
+    SELECT lunch_open, lunch_close, dinner_open, dinner_close
+    FROM restaurant_info
+    LIMIT 1
+""")
+
+GET_RESERVATIONS_FOR_DATE = text("""
+    SELECT 
+        r.id,
+        r.reservation_datetime,
+        r.number_of_guests,
+        rt.table_id
+    FROM reservations r
+    JOIN reservation_tables rt ON r.id = rt.reservation_id
+    WHERE DATE(r.reservation_datetime) = DATE(:target_date)
+    ORDER BY r.reservation_datetime
+""")
+
+INSERT_RESERVATION = text("""
+    INSERT INTO reservations (id, customer_name, customer_phone, reservation_datetime, number_of_guests, extra_infos)
+    VALUES (:id, :customer_name, :customer_phone, :reservation_datetime, :number_of_guests, :extra_infos)
+    RETURNING id
+""")
+
+INSERT_RESERVATION_TABLE = text("""
+    INSERT INTO reservation_tables (reservation_id, table_id)
+    VALUES (:reservation_id, :table_id)
+""")
+
+GET_MAX_CAPACITY = text("""
+    SELECT max_resa FROM restaurant_info LIMIT 1;
 """)

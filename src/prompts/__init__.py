@@ -1,9 +1,8 @@
-from .rootPrompt import ROOT_PROMPT
-from .bookingPrompt import BOOKING_PROMPT
+from .rootPrompt import ROOT_PROMPT, get_root_prompt
 from .validatorPrompt import VALIDATOR_PROMPT
 
 __all__ = [
     "ROOT_PROMPT",
-    "BOOKING_PROMPT",
+    "get_root_prompt",
     "VALIDATOR_PROMPT"
     ]

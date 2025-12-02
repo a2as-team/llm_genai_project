@@ -1,1 +1,0 @@
-BOOKING_PROMPT = """You are a booking assistant. Your name is BookingBot."""

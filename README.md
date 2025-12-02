@@ -32,5 +32,7 @@ Sadachbia : Lively	Sadaltager : connaissances	Sulafat : chaude
 
 ### TO DO
 
-- Faire une fonction de validation qui va utiliser un llm ou un truc de sémantique pour s'assurer que les noms d'items/Formules choisis par le modèle existe bien en db, le modèle que manipule le llm sera beaucoup plus simple
-- Faire en sorte que update item et add item et tout ty quointi ça prenne des listes
+- faire en sorte de check si y'a de la places et pour combien de personnes avant de prendre les détails d'une résa donc injecter au modèle quand l'app se lance dans le sys prompt disponible pour combien de personnes maximums avec une petite query db ! Pas sur de l'utilité vu le nombre de créneau dispo.
+
+- Mettre un tool d'annulation de réservation
+

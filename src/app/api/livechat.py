@@ -4,6 +4,7 @@ import base64
 import logging
 import os
 from typing import Optional
+from dotenv import load_dotenv
 
 from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
@@ -23,6 +24,8 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 from src.agents.root_agent.rootAgent import root_agent
 from src.config import app_settings, gemini_settings, database_settings
 from src.utils.context import set_request_context, clear_request_context, init_order
+
+load_dotenv()
 
 router = APIRouter(tags=["LiveChat"])
 logger = logging.getLogger(__name__)

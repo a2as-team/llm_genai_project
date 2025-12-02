@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from src.config import database_settings
 from src.bdd.query import *
 from src.bdd.schema import Base
-from src.models.order import Order
 
 # Database URL configuration
 DATABASE_URL_SYNC = database_settings.dsn
@@ -225,4 +224,114 @@ class DBManager:
                     })
 
             return str(new_order_id)
+
+    # -----------------------------------------------------
+    # BOOKING / RESERVATION METHODS
+    # -----------------------------------------------------
+
+    async def get_all_tables(self) -> list[dict]:
+        """Get all tables with their info."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_ALL_TABLES)
+            rows = result.fetchall()
+        return [{"id": row[0], "name": row[1], "capacity": row[2], "location": row[3]} for row in rows]
+
+    async def get_tables_by_location(self, location: str) -> list[dict]:
+        """Get tables filtered by location (indoor/outdoor)."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_TABLES_BY_LOCATION, {"location": location})
+            rows = result.fetchall()
+        return [{"id": row[0], "name": row[1], "capacity": row[2], "location": row[3]} for row in rows]
+
+    async def get_table_combinations(self) -> list[tuple]:
+        """Get all table combination pairs."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_TABLE_COMBINATIONS)
+            rows = result.fetchall()
+        return [(row[0], row[1]) for row in rows]
+
+    async def get_restaurant_settings(self) -> dict:
+        """Get restaurant settings (duration, buffer, time slot)."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_RESTAURANT_SETTINGS)
+            row = result.fetchone()
+        if row:
+            return {
+                "average_duration_minutes": row[0],
+                "buffer_time_minutes": row[1],
+                "reservation_time_slot": row[2]
+            }
+        # Defaults if not found
+        return {"average_duration_minutes": 120, "buffer_time_minutes": 15, "reservation_time_slot": 15}
+
+    async def get_restaurant_hours(self) -> dict:
+        """Get restaurant opening hours."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_RESTAURANT_HOURS)
+            row = result.fetchone()
+        if row:
+            return {
+                "lunch_open": row[0],
+                "lunch_close": row[1],
+                "dinner_open": row[2],
+                "dinner_close": row[3]
+            }
+        return {"lunch_open": "11h30", "lunch_close": "14h30", "dinner_open": "18h30", "dinner_close": "23h00"}
+
+    async def get_reservations_for_date(self, target_date: datetime) -> list[dict]:
+        """Get all reservations for a specific date with their assigned tables."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_RESERVATIONS_FOR_DATE, {"target_date": target_date})
+            rows = result.fetchall()
+        
+        reservations = {}
+        for row in rows:
+            res_id = row[0]
+            if res_id not in reservations:
+                reservations[res_id] = {
+                    "id": res_id,
+                    "reservation_datetime": row[1],
+                    "number_of_guests": row[2],
+                    "table_ids": []
+                }
+            reservations[res_id]["table_ids"].append(row[3])
+        
+        return list(reservations.values())
+
+    async def get_max_capacity(self) -> int:
+        """Get total restaurant capacity (sum of all table capacities)."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_MAX_CAPACITY)
+            row = result.fetchone()
+        return row[0] if row else 20  # Default to 20 if no tables
+
+    async def save_reservation(
+        self,
+        customer_name: str,
+        customer_phone: str,
+        reservation_datetime: datetime,
+        number_of_guests: int,
+        table_ids: list,
+        extra_infos: Optional[str] = None
+    ) -> str:
+        """Save a new reservation with its assigned tables."""
+        new_reservation_id = uuid4()
+
+        async with self.engine.begin() as conn:
+            await conn.execute(INSERT_RESERVATION, {
+                "id": new_reservation_id,
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+                "reservation_datetime": reservation_datetime,
+                "number_of_guests": number_of_guests,
+                "extra_infos": extra_infos
+            })
+
+            for table_id in table_ids:
+                await conn.execute(INSERT_RESERVATION_TABLE, {
+                    "reservation_id": new_reservation_id,
+                    "table_id": table_id
+                })
+
+        return str(new_reservation_id)
 
