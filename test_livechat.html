@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test LiveChat WebSocket</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #log { height: 400px; border: 1px solid #ccc; overflow-y: scroll; padding: 10px; margin-bottom: 10px; background: #f9f9f9; }
+        .message { margin-bottom: 5px; }
+        .agent { color: blue; }
+        .user { color: green; }
+        .system { color: gray; font-style: italic; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] { flex-grow: 1; padding: 5px; }
+        button { padding: 5px 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Test LiveChat WebSocket</h1>
+    
+    <div class="controls">
+        <label>User ID: <input type="text" id="userId" value="test_user_1"></label>
+        <label>Session ID: <input type="text" id="sessionId" placeholder="Optional"></label>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <div id="log"></div>
+
+    <div class="controls">
+        <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()">
+        <button onclick="sendMessage()">Send Text</button>
+        <button id="micBtn" onclick="toggleMicrophone()">Start Microphone</button>
+    </div>
+
+    <script>
+        let ws;
+        const logDiv = document.getElementById('log');
+        let audioContext = null;
+        let nextStartTime = 0;
+        
+        // Microphone variables
+        let isRecording = false;
+        let audioInputContext = null;
+        let processor = null;
+        let inputSource = null;
+        const targetSampleRate = 24000; // Gemini usually expects 16kHz or 24kHz
+
+        function log(text, type = 'system') {
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function connect() {
+            const userId = document.getElementById('userId').value;
+            const sessionId = document.getElementById('sessionId').value;
+            
+            let url = `ws://localhost:8000/api/ws/${userId}`;
+            if (sessionId) {
+                url += `?session_id=${sessionId}`;
+            }
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                log('Connected to WebSocket', 'system');
+                document.getElementById('messageInput').focus();
+            };
+
+            ws.onmessage = async (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Handle Session ID
+                    if (data.session_id) {
+                        log(`Session ID received: ${data.session_id}`, 'system');
+                        document.getElementById('sessionId').value = data.session_id;
+                    }
+
+                    // Handle Transcriptions
+                    if (data.input_transcription) {
+                        log(`User (Transcribed): ${data.input_transcription.text}`, 'user');
+                    }
+                    if (data.output_transcription) {
+                        log(`Agent (Transcribed): ${data.output_transcription.text}`, 'agent');
+                    }
+
+                    // Handle Parts (Text or Audio)
+                    if (data.parts && data.parts.length > 0) {
+                        for (const part of data.parts) {
+                            if (part.type === 'text') {
+                                log(`Agent: ${part.data}`, 'agent');
+                            } else if (part.type === 'audio/pcm') {
+                                log(`Agent sent audio chunk (${part.data.length} bytes)`, 'system');
+                                playPcmAudio(part.data);
+                            }
+                        }
+                    }
+                    
+                    if (data.turn_complete) {
+                        log('--- Turn Complete ---', 'system');
+                    }
+
+                } catch (e) {
+                    log('Received raw: ' + event.data, 'system');
+                }
+            };
+
+            ws.onclose = () => log('Disconnected', 'system');
+            ws.onerror = (err) => log('Error: ' + err, 'system');
+        }
+
+        function disconnect() {
+            stopMicrophone();
+            if (ws) ws.close();
+        }
+
+        function sendMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected', 'system');
+                return;
+            }
+            const input = document.getElementById('messageInput');
+            const text = input.value;
+            
+            if (!text) return;
+
+            // Format expected by the backend
+            const payload = {
+                mime_type: "text/plain",
+                data: text 
+            };
+
+            ws.send(JSON.stringify(payload));
+            log(`Sent: ${text}`, 'user');
+            input.value = '';
+        }
+
+        async function toggleMicrophone() {
+            const btn = document.getElementById('micBtn');
+            if (isRecording) {
+                stopMicrophone();
+                btn.textContent = "Start Microphone";
+                btn.style.backgroundColor = "";
+                btn.style.color = "";
+            } else {
+                try {
+                    await startMicrophone();
+                    btn.textContent = "Stop Microphone";
+                    btn.style.backgroundColor = "red";
+                    btn.style.color = "white";
+                } catch (err) {
+                    log("Error starting microphone: " + err, 'system');
+                }
+            }
+        }
+
+        async function startMicrophone() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert("Connect WebSocket first!");
+                throw new Error("WebSocket not connected");
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+                channelCount: 1,
+                sampleRate: targetSampleRate 
+            }});
+
+            audioInputContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: targetSampleRate });
+            inputSource = audioInputContext.createMediaStreamSource(stream);
+            
+            // Use ScriptProcessor (deprecated but works for simple demos)
+            processor = audioInputContext.createScriptProcessor(4096, 1, 1);
+
+            processor.onaudioprocess = (e) => {
+                if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+                const inputData = e.inputBuffer.getChannelData(0);
+                
+                // Convert Float32 to Int16
+                const pcm16 = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    let s = Math.max(-1, Math.min(1, inputData[i]));
+                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+
+                // Convert to Base64
+                const buffer = new Uint8Array(pcm16.buffer);
+                let binary = '';
+                for (let i = 0; i < buffer.byteLength; i++) {
+                    binary += String.fromCharCode(buffer[i]);
+                }
+                const base64Data = window.btoa(binary);
+
+                // Send
+                ws.send(JSON.stringify({
+                    mime_type: "audio/pcm",
+                    data: base64Data
+                }));
+            };
+
+            inputSource.connect(processor);
+            processor.connect(audioInputContext.destination);
+            isRecording = true;
+            log("Microphone started", 'system');
+        }
+
+        function stopMicrophone() {
+            if (processor) {
+                processor.disconnect();
+                processor.onaudioprocess = null;
+                processor = null;
+            }
+            if (inputSource) {
+                inputSource.disconnect();
+                inputSource = null;
+            }
+            if (audioInputContext) {
+                audioInputContext.close();
+                audioInputContext = null;
+            }
+            isRecording = false;
+            log("Microphone stopped", 'system');
+        }
+
+        // Simple PCM Player (Linear16, 24kHz usually for Gemini, adjust if needed)
+        function playPcmAudio(base64Data) {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            }
+
+            const binaryString = window.atob(base64Data);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            // Convert 16-bit PCM to Float32
+            const int16Data = new Int16Array(bytes.buffer);
+            const float32Data = new Float32Array(int16Data.length);
+            for (let i = 0; i < int16Data.length; i++) {
+                float32Data[i] = int16Data[i] / 32768.0;
+            }
+
+            const buffer = audioContext.createBuffer(1, float32Data.length, 24000);
+            buffer.getChannelData(0).set(float32Data);
+
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+
+            // Scheduling logic to prevent gaps
+            const currentTime = audioContext.currentTime;
+            if (nextStartTime < currentTime) {
+                nextStartTime = currentTime;
+            }
+            
+            source.start(nextStartTime);
+            nextStartTime += buffer.duration;
+        }
+    </script>
+</body>
+</html>
