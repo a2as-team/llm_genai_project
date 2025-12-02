@@ -268,6 +268,8 @@ class RestaurantInfo(Base):
     dinner_open: Mapped[str] = mapped_column(String)
     dinner_close: Mapped[str] = mapped_column(String)
 
+    max_resa: Mapped[int] = mapped_column(Integer, default=10)
+
     open_days: Mapped[str] = mapped_column(String)
 
     created_at: Mapped[datetime] = mapped_column(

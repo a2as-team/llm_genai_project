@@ -298,6 +298,13 @@ class DBManager:
         
         return list(reservations.values())
 
+    async def get_max_capacity(self) -> int:
+        """Get total restaurant capacity (sum of all table capacities)."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_MAX_CAPACITY)
+            row = result.fetchone()
+        return row[0] if row else 20  # Default to 20 if no tables
+
     async def save_reservation(
         self,
         customer_name: str,

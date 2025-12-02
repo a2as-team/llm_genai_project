@@ -243,6 +243,7 @@ INSERT INTO restaurant_info (
     lunch_close,
     dinner_open,
     dinner_close,
+    max_resa,
     open_days
 )
 VALUES (
@@ -268,6 +269,7 @@ VALUES (
     '14h30',
     '18h30',
     '23h00',
+    10,
     'Tous les jours'
 );
 """)
@@ -405,4 +407,8 @@ INSERT_RESERVATION = text("""
 INSERT_RESERVATION_TABLE = text("""
     INSERT INTO reservation_tables (reservation_id, table_id)
     VALUES (:reservation_id, :table_id)
+""")
+
+GET_MAX_CAPACITY = text("""
+    SELECT max_resa FROM restaurant_info LIMIT 1;
 """)
