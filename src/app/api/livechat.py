@@ -2,7 +2,7 @@ import json
 import asyncio
 import base64
 import logging
-import os
+import uuid
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -23,7 +23,7 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 
 from src.agents.root_agent.rootAgent import root_agent
 from src.config import app_settings, gemini_settings, database_settings
-from src.utils.context import set_request_context, clear_request_context, init_order
+from src.utils.context import set_request_context, clear_request_context
 
 load_dotenv()
 
@@ -274,26 +274,38 @@ async def client_to_agent_messaging(websocket: WebSocket, live_request_queue: Li
         logger.error(f"Fatal error in client_to_agent_messaging: {e}")
 
 
-@router.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: Optional[str] = None):
-    """Client websocket endpoint"""
+@router.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    user_id: Optional[str] = None, 
+    session_id: Optional[str] = None
+):
+    """Client websocket endpoint
+    
+    Args:
+        websocket: WebSocket connection
+        user_id: Optional user ID (auto-generated UUID if not provided)
+        session_id: Optional session ID (auto-generated if not provided)
+    """
 
     # Wait for client connection
     await websocket.accept()
 
-    # Start agent session
-    user_id_str = str(user_id)
+    # Generate user_id if not provided
+    user_id_str = user_id if user_id else str(uuid.uuid4())
+    
     print("\n" + "=" * 80)
     print(f"🔗 NEW WEBSOCKET CONNECTION")
-    print(f"   User ID: {user_id_str}")
-    print(f"   Session ID: {session_id}")
+    print(f"   User ID: {user_id_str}" + (" (auto-generated)" if not user_id else ""))
+    print(f"   Session ID: {session_id}" + (" (will be generated)" if not session_id else ""))
     print("=" * 80)
     
     live_events, live_request_queue, session_id = await start_agent_session(user_id_str, session_id)
     
-    # Send session ID to client
+    # Send session ID and user ID to client
     await websocket.send_text(json.dumps({
-        "session_id": session_id
+        "session_id": session_id,
+        "user_id": user_id_str
     }))
     print(f"✅ Session initialized: {session_id}\n")
 
