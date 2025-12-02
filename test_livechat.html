@@ -20,8 +20,8 @@
     <h1>Test LiveChat WebSocket</h1>
     
     <div class="controls">
-        <label>User ID: <input type="text" id="userId" value="test_user_1"></label>
-        <label>Session ID: <input type="text" id="sessionId" placeholder="Optional"></label>
+        <label>User ID: <input type="text" id="userId" placeholder="Optional (auto-generated)"></label>
+        <label>Session ID: <input type="text" id="sessionId" placeholder="Optional (auto-generated)"></label>
         <button onclick="connect()">Connect</button>
         <button onclick="disconnect()">Disconnect</button>
     </div>
@@ -59,10 +59,12 @@
             const userId = document.getElementById('userId').value;
             const sessionId = document.getElementById('sessionId').value;
             
-            let url = `ws://localhost:8000/api/ws/${userId}`;
-            if (sessionId) {
-                url += `?session_id=${sessionId}`;
-            }
+            // Build URL with optional query params
+            let url = `ws://localhost:8000/api/ws`;
+            const params = new URLSearchParams();
+            if (userId) params.append('user_id', userId);
+            if (sessionId) params.append('session_id', sessionId);
+            if (params.toString()) url += `?${params.toString()}`;
 
             ws = new WebSocket(url);
 
@@ -75,10 +77,14 @@
                 try {
                     const data = JSON.parse(event.data);
                     
-                    // Handle Session ID
-                    if (data.session_id) {
-                        log(`Session ID received: ${data.session_id}`, 'system');
+                    // Handle Session ID and User ID from server
+                    if (data.session_id && !document.getElementById('sessionId').value) {
+                        log(`Session ID: ${data.session_id}`, 'system');
                         document.getElementById('sessionId').value = data.session_id;
+                    }
+                    if (data.user_id && !document.getElementById('userId').value) {
+                        log(`User ID (auto-generated): ${data.user_id}`, 'system');
+                        document.getElementById('userId').value = data.user_id;
                     }
 
                     // Handle Transcriptions
