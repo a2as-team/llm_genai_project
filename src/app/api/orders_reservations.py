@@ -1,19 +1,21 @@
-"""Orders and Reservations API routes.
-
-Provides endpoints to retrieve orders and reservations data from the database.
-"""
+"""Orders and Reservations API routes - Client and Admin endpoints."""
 
 import logging
 from typing import List, Optional
 from uuid import UUID
+import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func, or_, Date, cast
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy import select, func, Date, cast, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
+from datetime import datetime, date
+from pydantic import BaseModel
 
 from src.bdd.dbmanager import DBManager
-from src.bdd.schema import Order, Reservation, OrderFormule, OrderItem, OrderFormuleItem, MenuItem, RestaurantTable
+from src.bdd.schema import Order, Reservation, OrderFormule, OrderItem, MenuItem, RestaurantTable
+from src.utils.sse_manager import sse_manager, EventType
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Orders & Reservations"], prefix="/data")
@@ -28,110 +30,23 @@ async def get_db() -> AsyncSession:
 
 
 # ============================================================================
-# ORDERS ENDPOINTS
+# PYDANTIC MODELS
 # ============================================================================
 
 
-@router.get("/orders", response_model=List[dict])
-async def get_all_orders(
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
-):
-    """Get all orders with pagination."""
-    try:
-        query = select(Order).options(
-            selectinload(Order.formules),
-            selectinload(Order.items)
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        orders = result.scalars().all()
-
-        return [
-            {
-                "id": str(order.id),
-                "customer_name": order.customer_name,
-                "customer_phone": order.customer_phone,
-                "is_validated": order.is_validated,
-                "created_at": order.created_at.isoformat() if order.created_at else None,
-                "updated_at": order.updated_at.isoformat() if order.updated_at else None,
-                "formules_count": len(order.formules),
-                "items_count": len(order.items),
-            }
-            for order in orders
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching orders: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching orders")
+class OrderUpdateRequest(BaseModel):
+    """Request model for updating order fields."""
+    is_validated: Optional[bool] = None
 
 
-# ⚠️ IMPORTANT: These specific routes MUST come before /{order_id}
-# Otherwise /validated, /pending, /customer/{name} will be interpreted as order IDs
-
-@router.get("/orders/validated", response_model=List[dict])
-async def get_validated_orders(
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
-):
-    """Get all validated orders."""
-    try:
-        query = select(Order).where(Order.is_validated == True).options(
-            selectinload(Order.formules),
-            selectinload(Order.items)
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        orders = result.scalars().all()
-
-        return [
-            {
-                "id": str(order.id),
-                "customer_name": order.customer_name,
-                "customer_phone": order.customer_phone,
-                "is_validated": order.is_validated,
-                "created_at": order.created_at.isoformat() if order.created_at else None,
-                "updated_at": order.updated_at.isoformat() if order.updated_at else None,
-                "formules_count": len(order.formules),
-                "items_count": len(order.items),
-            }
-            for order in orders
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching validated orders: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching validated orders")
+class ReservationUpdateRequest(BaseModel):
+    """Request model for updating reservation fields."""
+    pass
 
 
-@router.get("/orders/pending", response_model=List[dict])
-async def get_pending_orders(
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
-):
-    """Get all pending (not validated) orders."""
-    try:
-        query = select(Order).where(Order.is_validated == False).options(
-            selectinload(Order.formules),
-            selectinload(Order.items)
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        orders = result.scalars().all()
-
-        return [
-            {
-                "id": str(order.id),
-                "customer_name": order.customer_name,
-                "customer_phone": order.customer_phone,
-                "is_validated": order.is_validated,
-                "created_at": order.created_at.isoformat() if order.created_at else None,
-                "updated_at": order.updated_at.isoformat() if order.updated_at else None,
-                "formules_count": len(order.formules),
-                "items_count": len(order.items),
-            }
-            for order in orders
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching pending orders: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching pending orders")
+# ============================================================================
+# CLIENT ROUTES - Simple endpoints for customers
+# ============================================================================
 
 
 @router.get("/orders/customer/{customer_name}", response_model=List[dict])
@@ -171,154 +86,6 @@ async def get_orders_by_customer(
         raise HTTPException(status_code=500, detail="Error fetching customer orders")
 
 
-# Generic {order_id} route MUST come LAST
-@router.get("/orders/{order_id}", response_model=dict)
-async def get_order_details(
-    order_id: UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    """Get detailed information about a specific order."""
-    try:
-        # Load order with all related formules and items
-        query = select(Order).where(Order.id == order_id).options(
-            selectinload(Order.formules).selectinload(OrderFormule.items).selectinload(OrderFormuleItem.item),
-            selectinload(Order.items).selectinload(OrderItem.item)
-        )
-        result = await db.execute(query)
-        order = result.scalar_one_or_none()
-
-        if not order:
-            raise HTTPException(status_code=404, detail="Order not found")
-
-        # Build formules data
-        formules = []
-        for formule in order.formules:
-            formule_items = []
-            for item in formule.items:
-                formule_items.append({
-                    "id": str(item.id),
-                    "item_id": str(item.item_id),
-                    "item_name": item.item.name if item.item else None,
-                    "indications": item.indications,
-                })
-
-            formules.append({
-                "id": str(formule.id),
-                "formule_name": formule.formule_name,
-                "formula_base_price": float(formule.formula_base_price),
-                "quantity": formule.quantity,
-                "created_at": formule.created_at.isoformat() if formule.created_at else None,
-                "items": formule_items,
-            })
-
-        # Build items data
-        items = []
-        for item in order.items:
-            items.append({
-                "id": str(item.id),
-                "item_id": str(item.item_id),
-                "item_name": item.item.name if item.item else None,
-                "quantity": item.quantity,
-                "price": float(item.item.price) if item.item else None,
-                "indications": item.indications,
-                "created_at": item.created_at.isoformat() if item.created_at else None,
-            })
-
-        return {
-            "id": str(order.id),
-            "customer_name": order.customer_name,
-            "customer_phone": order.customer_phone,
-            "is_validated": order.is_validated,
-            "created_at": order.created_at.isoformat() if order.created_at else None,
-            "updated_at": order.updated_at.isoformat() if order.updated_at else None,
-            "formules": formules,
-            "items": items,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching order {order_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching order")
-
-
-# ============================================================================
-# RESERVATIONS ENDPOINTS
-# ============================================================================
-
-
-@router.get("/reservations", response_model=List[dict])
-async def get_all_reservations(
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
-):
-    """Get all reservations with pagination."""
-    try:
-        query = select(Reservation).options(
-            selectinload(Reservation.tables)
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        reservations = result.scalars().all()
-
-        return [
-            {
-                "id": str(reservation.id),
-                "customer_name": reservation.customer_name,
-                "customer_phone": reservation.customer_phone,
-                "reservation_datetime": reservation.reservation_datetime.isoformat() if reservation.reservation_datetime else None,
-                "number_of_guests": reservation.number_of_guests,
-                "extra_infos": reservation.extra_infos,
-                "created_at": reservation.created_at.isoformat() if reservation.created_at else None,
-                "updated_at": reservation.updated_at.isoformat() if reservation.updated_at else None,
-                "tables_count": len(reservation.tables),
-            }
-            for reservation in reservations
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching reservations: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching reservations")
-
-
-# ⚠️ IMPORTANT: These specific routes MUST come before /{reservation_id}
-
-@router.get("/reservations/upcoming", response_model=List[dict])
-async def get_upcoming_reservations(
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 50,
-):
-    """Get all upcoming reservations (from now onwards)."""
-    try:
-        from datetime import datetime, timezone
-        
-        now = datetime.now(timezone.utc)
-        query = select(Reservation).where(
-            Reservation.reservation_datetime >= now
-        ).options(
-            selectinload(Reservation.tables)
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        reservations = result.scalars().all()
-
-        return [
-            {
-                "id": str(reservation.id),
-                "customer_name": reservation.customer_name,
-                "customer_phone": reservation.customer_phone,
-                "reservation_datetime": reservation.reservation_datetime.isoformat() if reservation.reservation_datetime else None,
-                "number_of_guests": reservation.number_of_guests,
-                "extra_infos": reservation.extra_infos,
-                "created_at": reservation.created_at.isoformat() if reservation.created_at else None,
-                "updated_at": reservation.updated_at.isoformat() if reservation.updated_at else None,
-                "tables_count": len(reservation.tables),
-            }
-            for reservation in reservations
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching upcoming reservations: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching upcoming reservations")
-
-
 @router.get("/reservations/customer/{customer_name}", response_model=List[dict])
 async def get_reservations_by_customer(
     customer_name: str,
@@ -356,32 +123,128 @@ async def get_reservations_by_customer(
         raise HTTPException(status_code=500, detail="Error fetching customer reservations")
 
 
-@router.get("/reservations/date/{date}", response_model=List[dict])
-async def get_reservations_by_date(
-    date: str,  # Format: YYYY-MM-DD
+# ============================================================================
+# ADMIN ROUTES - Modular endpoints with filters
+# ============================================================================
+
+
+@router.get("/admin/orders", response_model=List[dict])
+async def get_orders_admin(
+    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format"),
+    customer_name: Optional[str] = Query(None, description="Filter by customer name (case-insensitive)"),
+    is_validated: Optional[bool] = Query(None, description="Filter by validation status"),
     db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
 ):
-    """Get all reservations for a specific date.
+    """
+    Get orders with optional filters for admin panel.
     
-    Args:
-        date: Date in YYYY-MM-DD format
+    Query parameters:
+    - date: Filter by creation date (YYYY-MM-DD)
+    - customer_name: Filter by customer name (case-insensitive, partial match)
+    - is_validated: Filter by validation status (true/false)
+    - skip: Pagination offset
+    - limit: Pagination limit
     """
     try:
-        from datetime import datetime
-        from sqlalchemy import cast, Date
+        # Build the query dynamically based on filters
+        filters = []
         
-        # Parse the date string
-        reservation_date = datetime.strptime(date, "%Y-%m-%d").date()
+        # Date filter
+        if date:
+            try:
+                filter_date = datetime.strptime(date, "%Y-%m-%d").date()
+                filters.append(cast(Order.created_at, Date) == filter_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         
-        # Query reservations on that date - cast TIMESTAMP to DATE for comparison
-        query = select(Reservation).where(
-            cast(Reservation.reservation_datetime, Date) == reservation_date
-        ).options(
+        # Customer name filter (case-insensitive, partial match)
+        if customer_name:
+            filters.append(func.lower(Order.customer_name).contains(customer_name.lower()))
+        
+        # Validation status filter
+        if is_validated is not None:
+            filters.append(Order.is_validated == is_validated)
+        
+        # Combine all filters with AND
+        query = select(Order).options(
+            selectinload(Order.formules),
+            selectinload(Order.items)
+        )
+        
+        if filters:
+            query = query.where(and_(*filters))
+        
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        orders = result.scalars().all()
+        
+        return [
+            {
+                "id": str(order.id),
+                "customer_name": order.customer_name,
+                "customer_phone": order.customer_phone,
+                "is_validated": order.is_validated,
+                "created_at": order.created_at.isoformat() if order.created_at else None,
+                "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+                "formules_count": len(order.formules),
+                "items_count": len(order.items),
+            }
+            for order in orders
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching orders with filters: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching orders")
+
+
+@router.get("/admin/reservations", response_model=List[dict])
+async def get_reservations_admin(
+    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format"),
+    customer_name: Optional[str] = Query(None, description="Filter by customer name (case-insensitive)"),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """
+    Get reservations with optional filters for admin panel.
+    
+    Query parameters:
+    - date: Filter by reservation date (YYYY-MM-DD)
+    - customer_name: Filter by customer name (case-insensitive, partial match)
+    - skip: Pagination offset
+    - limit: Pagination limit
+    """
+    try:
+        # Build the query dynamically based on filters
+        filters = []
+        
+        # Date filter (reservation_datetime)
+        if date:
+            try:
+                filter_date = datetime.strptime(date, "%Y-%m-%d").date()
+                filters.append(cast(Reservation.reservation_datetime, Date) == filter_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        # Customer name filter (case-insensitive, partial match)
+        if customer_name:
+            filters.append(func.lower(Reservation.customer_name).contains(customer_name.lower()))
+        
+        # Combine all filters with AND
+        query = select(Reservation).options(
             selectinload(Reservation.tables)
         )
+        
+        if filters:
+            query = query.where(and_(*filters))
+        
+        query = query.offset(skip).limit(limit)
         result = await db.execute(query)
         reservations = result.scalars().all()
-
+        
         return [
             {
                 "id": str(reservation.id),
@@ -396,54 +259,250 @@ async def get_reservations_by_date(
             }
             for reservation in reservations
         ]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error fetching reservations for date {date}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching reservations by date")
+        logger.error(f"Error fetching reservations with filters: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching reservations")
 
 
-# Generic {reservation_id} route MUST come LAST
-@router.get("/reservations/{reservation_id}", response_model=dict)
-async def get_reservation_details(
-    reservation_id: UUID,
+# ============================================================================
+# ADMIN UPDATE ENDPOINTS
+# ============================================================================
+
+
+@router.patch("/admin/orders/{order_id}")
+async def update_order(
+    order_id: UUID,
+    request: OrderUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get detailed information about a specific reservation."""
+    """
+    Update an order (is_validated).
+    
+    Publishes an order_updated event via SSE.
+    """
     try:
-        # Load reservation with all related data
-        query = select(Reservation).where(Reservation.id == reservation_id).options(
-            selectinload(Reservation.tables)
+        # Fetch the order
+        query = select(Order).where(Order.id == order_id).options(
+            selectinload(Order.formules),
+            selectinload(Order.items)
         )
         result = await db.execute(query)
-        reservation = result.scalar_one_or_none()
-
-        if not reservation:
-            raise HTTPException(status_code=404, detail="Reservation not found")
-
-        # Build tables data
-        tables = []
-        for table in reservation.tables:
-            tables.append({
-                "id": str(table.id),
-                "name": table.name,
-                "capacity": table.capacity,
-                "location": table.location,
-            })
-
+        order = result.scalar_one_or_none()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Update fields if provided
+        if request.is_validated is not None:
+            order.is_validated = request.is_validated
+        
+        # Commit changes
+        await db.commit()
+        await db.refresh(order)
+        
+        # Publish SSE event
+        await sse_manager.publish_order_event(
+            EventType.ORDER_UPDATED,
+            {
+                "id": str(order.id),
+                "customer_name": order.customer_name,
+                "is_validated": order.is_validated,
+                "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+            }
+        )
+        
         return {
-            "id": str(reservation.id),
-            "customer_name": reservation.customer_name,
-            "customer_phone": reservation.customer_phone,
-            "reservation_datetime": reservation.reservation_datetime.isoformat() if reservation.reservation_datetime else None,
-            "number_of_guests": reservation.number_of_guests,
-            "extra_infos": reservation.extra_infos,
-            "created_at": reservation.created_at.isoformat() if reservation.created_at else None,
-            "updated_at": reservation.updated_at.isoformat() if reservation.updated_at else None,
-            "tables": tables,
+            "id": str(order.id),
+            "customer_name": order.customer_name,
+            "customer_phone": order.customer_phone,
+            "is_validated": order.is_validated,
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+            "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+            "formules_count": len(order.formules),
+            "items_count": len(order.items),
         }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching reservation {reservation_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching reservation")
+        logger.error(f"Error updating order {order_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error updating order")
+
+
+@router.delete("/admin/orders/{order_id}")
+async def delete_order(
+    order_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete an order (hard delete).
+    
+    Publishes an order_deleted event via SSE.
+    """
+    try:
+        # Fetch the order
+        query = select(Order).where(Order.id == order_id)
+        result = await db.execute(query)
+        order = result.scalar_one_or_none()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Store info before deletion for SSE event
+        order_info = {
+            "id": str(order.id),
+            "customer_name": order.customer_name,
+        }
+        
+        # Delete the order
+        await db.delete(order)
+        await db.commit()
+        
+        # Publish SSE event
+        await sse_manager.publish_order_event(
+            EventType.ORDER_DELETED,
+            order_info
+        )
+        
+        return {"message": "Order deleted successfully", "id": str(order_id)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting order {order_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error deleting order")
+
+
+@router.delete("/admin/reservations/{reservation_id}")
+async def delete_reservation(
+    reservation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete a reservation (hard delete).
+    
+    Publishes a reservation_deleted event via SSE.
+    """
+    try:
+        # Fetch the reservation
+        query = select(Reservation).where(Reservation.id == reservation_id)
+        result = await db.execute(query)
+        reservation = result.scalar_one_or_none()
+        
+        if not reservation:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        
+        # Store info before deletion for SSE event
+        reservation_info = {
+            "id": str(reservation.id),
+            "customer_name": reservation.customer_name,
+        }
+        
+        # Delete the reservation
+        await db.delete(reservation)
+        await db.commit()
+        
+        # Publish SSE event
+        await sse_manager.publish_reservation_event(
+            EventType.RESERVATION_DELETED,
+            reservation_info
+        )
+        
+        return {"message": "Reservation deleted successfully", "id": str(reservation_id)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting reservation {reservation_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error deleting reservation")
+
+
+# ============================================================================
+# SSE ENDPOINTS - REAL-TIME UPDATES
+# ============================================================================
+
+
+@router.get("/admin/orders/stream")
+async def orders_stream():
+    """
+    SSE endpoint for real-time order updates.
+    
+    Clients should connect to this endpoint and listen for events:
+    - order_created: New order created
+    - order_updated: Order updated
+    - order_deleted: Order deleted
+    """
+    async def event_generator():
+        queue = await sse_manager.subscribe_orders()
+        try:
+            # Send initial connection message
+            yield "data: {\"message\": \"Connected to orders stream\"}\n\n"
+            
+            while True:
+                # Wait for next event with timeout to detect disconnections
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield event.to_sse_format()
+                except asyncio.TimeoutError:
+                    # Send keep-alive comment every 30 seconds
+                    yield ": keep-alive\n\n"
+        except asyncio.CancelledError:
+            await sse_manager.unsubscribe_orders(queue)
+            logger.info("Orders stream client disconnected")
+        except Exception as e:
+            logger.error(f"Error in orders stream: {e}")
+            await sse_manager.unsubscribe_orders(queue)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+@router.get("/admin/reservations/stream")
+async def reservations_stream():
+    """
+    SSE endpoint for real-time reservation updates.
+    
+    Clients should connect to this endpoint and listen for events:
+    - reservation_created: New reservation created
+    - reservation_updated: Reservation updated
+    - reservation_deleted: Reservation deleted
+    """
+    async def event_generator():
+        queue = await sse_manager.subscribe_reservations()
+        try:
+            # Send initial connection message
+            yield "data: {\"message\": \"Connected to reservations stream\"}\n\n"
+            
+            while True:
+                # Wait for next event with timeout to detect disconnections
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield event.to_sse_format()
+                except asyncio.TimeoutError:
+                    # Send keep-alive comment every 30 seconds
+                    yield ": keep-alive\n\n"
+        except asyncio.CancelledError:
+            await sse_manager.unsubscribe_reservations(queue)
+            logger.info("Reservations stream client disconnected")
+        except Exception as e:
+            logger.error(f"Error in reservations stream: {e}")
+            await sse_manager.unsubscribe_reservations(queue)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
