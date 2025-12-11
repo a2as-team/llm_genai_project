@@ -96,19 +96,30 @@ async def validate_order(order_text: str, customerName: str, customerPhone: str 
         # Sauvegarder en BDD
         order_id = await db_manager.save_full_order(draft_order, customerName, customerPhone)
         
-        # Publier l'événement SSE
-        await sse_manager.publish_order_event(
-            EventType.ORDER_CREATED,
-            {
-                "id": order_id,
-                "customer_name": customerName,
-                "customer_phone": customerPhone,
-                "is_validated": True,
-                "items_count": len(draft_order.items),
-                "formules_count": len(draft_order.formules),
-                "created_at": draft_order.created_at.isoformat() if hasattr(draft_order, 'created_at') and draft_order.created_at else None,
-            }
-        )
+        # Récupérer la commande complète depuis la BDD pour avoir tous les champs (created_at, updated_at, etc.)
+        from sqlalchemy import select
+        from src.bdd.schema import Order
+        
+        async with db_manager.SessionLocal() as session:
+            query = select(Order).where(Order.id == order_id)
+            result = await session.execute(query)
+            order = result.scalar_one_or_none()
+        
+        # Publier l'événement SSE avec les données complètes de la commande
+        if order:
+            await sse_manager.publish_order_event(
+                EventType.ORDER_CREATED,
+                {
+                    "id": str(order.id),
+                    "customer_name": order.customer_name,
+                    "customer_phone": order.customer_phone,
+                    "is_validated": order.is_validated,
+                    "items_count": len(order.items),
+                    "formules_count": len(order.formules),
+                    "created_at": order.created_at.isoformat() if order.created_at else None,
+                    "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+                }
+            )
         
         return {
             "success": True,

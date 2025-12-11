@@ -302,14 +302,18 @@ async def update_order(
         await db.commit()
         await db.refresh(order)
         
-        # Publish SSE event
+        # Publish SSE event with complete order data (same fields as GET endpoint)
         await sse_manager.publish_order_event(
             EventType.ORDER_UPDATED,
             {
                 "id": str(order.id),
                 "customer_name": order.customer_name,
+                "customer_phone": order.customer_phone,
                 "is_validated": order.is_validated,
+                "created_at": order.created_at.isoformat() if order.created_at else None,
                 "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+                "formules_count": len(order.formules),
+                "items_count": len(order.items),
             }
         )
         
