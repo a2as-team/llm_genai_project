@@ -335,3 +335,55 @@ class DBManager:
 
         return str(new_reservation_id)
 
+    # -----------------------------------------------------
+    # CANCEL BOOKING METHODS
+    # -----------------------------------------------------
+
+    async def find_reservations_by_phone_and_date(self, phone: str, target_date: datetime) -> list[dict]:
+        """Find reservations matching phone number and date."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_RESERVATIONS_BY_PHONE_AND_DATE, {
+                "phone": phone,
+                "target_date": target_date
+            })
+            rows = result.fetchall()
+        
+        return [
+            {
+                "id": row[0],
+                "customer_name": row[1],
+                "customer_phone": row[2],
+                "reservation_datetime": row[3],
+                "number_of_guests": row[4],
+                "extra_infos": row[5]
+            }
+            for row in rows
+        ]
+
+    async def find_reservations_by_phone(self, phone: str) -> list[dict]:
+        """Find all reservations for a phone number."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_RESERVATIONS_BY_PHONE, {"phone": phone})
+            rows = result.fetchall()
+        
+        return [
+            {
+                "id": row[0],
+                "customer_name": row[1],
+                "customer_phone": row[2],
+                "reservation_datetime": row[3],
+                "number_of_guests": row[4],
+                "extra_infos": row[5]
+            }
+            for row in rows
+        ]
+
+    async def delete_reservation(self, reservation_id) -> bool:
+        """Delete a reservation and its table associations."""
+        async with self.engine.begin() as conn:
+            # First delete table associations
+            await conn.execute(DELETE_RESERVATION_TABLES, {"reservation_id": reservation_id})
+            # Then delete the reservation
+            await conn.execute(DELETE_RESERVATION, {"reservation_id": reservation_id})
+        return True
+

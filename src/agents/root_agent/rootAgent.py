@@ -6,6 +6,7 @@ from src.tools import (
     get_informations,
     validate_order,
     validate_booking,
+    cancel_booking,
 )
 
 
@@ -25,6 +26,7 @@ def create_root_agent() -> Agent:
             get_informations,
             validate_order,
             validate_booking,
+            cancel_booking,
         ],  
     )
 
