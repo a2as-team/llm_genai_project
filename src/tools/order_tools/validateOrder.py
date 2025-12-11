@@ -4,6 +4,7 @@ from src.bdd.dbmanager import DBManager
 from src.models.order_draft import DraftOrder, DraftOrderItem, DraftOrderFormule, DraftFormuleItem
 from src.prompts.validatorPrompt import VALIDATOR_PROMPT
 from src.config import gemini_settings
+from src.utils.sse_manager import sse_manager, EventType
 from logging import getLogger
 
 
@@ -94,6 +95,20 @@ async def validate_order(order_text: str, customerName: str, customerPhone: str 
         
         # Sauvegarder en BDD
         order_id = await db_manager.save_full_order(draft_order, customerName, customerPhone)
+        
+        # Publier l'événement SSE
+        await sse_manager.publish_order_event(
+            EventType.ORDER_CREATED,
+            {
+                "id": order_id,
+                "customer_name": customerName,
+                "customer_phone": customerPhone,
+                "is_validated": True,
+                "items_count": len(draft_order.items),
+                "formules_count": len(draft_order.formules),
+                "created_at": draft_order.created_at.isoformat() if hasattr(draft_order, 'created_at') and draft_order.created_at else None,
+            }
+        )
         
         return {
             "success": True,
