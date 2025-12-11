@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from datetime import datetime, date
 from pydantic import BaseModel
+from typing import AsyncGenerator
 
 from src.bdd.dbmanager import DBManager
 from src.bdd.schema import Order, Reservation, OrderFormule, OrderItem, MenuItem, RestaurantTable
@@ -23,7 +24,7 @@ router = APIRouter(tags=["Orders & Reservations"], prefix="/data")
 db_manager = DBManager()
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Get database session dependency."""
     async with db_manager.SessionLocal() as session:
         yield session
