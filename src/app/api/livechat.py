@@ -93,9 +93,11 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
             automatic_activity_detection=types.AutomaticActivityDetection(
                 start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
                 end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
-                prefix_padding_ms=100,
-                silence_duration_ms=200,
-            )
+                prefix_padding_ms=200,
+                silence_duration_ms=400,
+            ),
+            activity_handling=types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
+            turn_coverage=types.TurnCoverage.TURN_INCLUDES_ONLY_ACTIVITY,
         ),
         response_modalities = [types.Modality.AUDIO],
         speech_config=types.SpeechConfig(

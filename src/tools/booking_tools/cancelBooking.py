@@ -14,10 +14,55 @@ from uuid import UUID
 
 from src.bdd.dbmanager import DBManager
 from src.models.booking import CancelBookingResponse, ReservationSummary
-from src.tools.booking_tools.validateBooking import parse_datetime_string
 
 # Timezone du restaurant (Paris)
 RESTAURANT_TZ = ZoneInfo("Europe/Paris")
+
+
+def parse_date_string(date_str: str) -> datetime:
+    """
+    Parse various date string formats into a datetime object.
+    Only parses the DATE part, ignores time if present.
+    
+    Supported formats:
+    - ISO 8601: '2025-12-15', '2025-12-15T20:00:00', '2025-12-15T20:00'
+    - French format: '15/12/2025', '15/12/2025 20:00'
+    - French dash: '15-12-2025'
+    """
+    date_str = date_str.strip()
+    
+    # Remove time part if present (after T or space)
+    if 'T' in date_str:
+        date_str = date_str.split('T')[0]
+    elif ' ' in date_str:
+        date_str = date_str.split(' ')[0]
+    
+    # Replace common separators
+    date_str = date_str.replace('h', ':')
+    
+    # List of date-only formats to try
+    formats = [
+        '%Y-%m-%d',      # ISO: 2025-12-15
+        '%d/%m/%Y',      # French: 15/12/2025
+        '%d-%m-%Y',      # French dash: 15-12-2025
+    ]
+    
+    for fmt in formats:
+        try:
+            print(f"[parse_date_string] Trying format: {fmt} for date_str: {date_str}, final datetime {datetime.strptime(date_str, fmt)}")
+            return datetime.strptime(date_str, fmt)
+
+        except ValueError:
+            continue
+    
+    # If all formats fail, raise an error
+    raise ValueError(
+        f"Format de date non reconnu: '{date_str}'. "
+        "Formats acceptés: '2025-12-15', '15/12/2025', '15-12-2025'"
+    )
+    
+
+
 
 
 def format_reservation_datetime(dt: datetime) -> str:
@@ -73,9 +118,9 @@ async def cancel_booking(
                     reservations_found=None
                 )
         
-        # Parse the date string
+        # Parse the date string (date only, no time needed)
         try:
-            target_date = parse_datetime_string(date)
+            target_date = parse_date_string(date)
         except ValueError as e:
             return CancelBookingResponse(
                 success=False,
