@@ -25,6 +25,7 @@ logging.basicConfig(
 )
 
 # Silence verbose Google libraries (they log prompts at INFO/DEBUG level)
+logging.getLogger("google_adk").setLevel(logging.WARNING)  # Main ADK logger
 logging.getLogger("google.adk").setLevel(logging.WARNING)
 logging.getLogger("google.genai").setLevel(logging.WARNING)
 logging.getLogger("google.api_core").setLevel(logging.WARNING)
