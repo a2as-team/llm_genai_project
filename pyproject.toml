@@ -19,6 +19,7 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "sqlalchemy>=2.0.43",
     "ortools>=9.14.6206",
+    "greenlet>=3.2.4",
 ]
 
 [tool.uv]

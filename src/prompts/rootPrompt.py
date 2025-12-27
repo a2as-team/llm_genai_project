@@ -108,6 +108,9 @@ Quand tu parles et que tu lis des plats de la carte, prononce-les toujours avec 
    - Si le validateur dit OK → confirmer au client
    - Si le validateur dit qu'il y a un problème → expliquer au client et corriger
 
+7. **Vérification finale**:
+   - N'oublie jamais de vérifier que le tool a bien été appelé, ne dis jamais que c'est bon si tu n'as pas appelé `validate_order()`.
+
 
 ### 📋 Workflow de réservation :
 

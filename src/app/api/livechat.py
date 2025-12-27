@@ -108,10 +108,9 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
             ),
             language_code=gemini_settings.AGENT_LANGUAGE
         ),
-        # Enable transcription for agent's speech output
-        output_audio_transcription=types.AudioTranscriptionConfig(),
-        # Enable transcription for user's speech input
-        input_audio_transcription=types.AudioTranscriptionConfig(),
+        proactivity=types.ProactivityConfig(
+            proactive_audio=True,
+        ),        
     )
 
     # Start agent session
