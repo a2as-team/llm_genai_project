@@ -5,6 +5,7 @@ from .order_tools import (
 )
 from .booking_tools import (
     validate_booking,
+    cancel_booking,
 )
 
 
@@ -13,4 +14,5 @@ __all__ = [
     "get_menu",
     "get_informations",
     "validate_booking",
+    "cancel_booking",
 ]

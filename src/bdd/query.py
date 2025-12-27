@@ -412,3 +412,44 @@ INSERT_RESERVATION_TABLE = text("""
 GET_MAX_CAPACITY = text("""
     SELECT max_resa FROM restaurant_info LIMIT 1;
 """)
+
+# =============================================================================
+# CANCEL BOOKING QUERIES
+# =============================================================================
+
+GET_RESERVATIONS_BY_PHONE_AND_DATE = text("""
+    SELECT 
+        id,
+        customer_name,
+        customer_phone,
+        reservation_datetime,
+        number_of_guests,
+        extra_infos
+    FROM reservations
+    WHERE customer_phone = :phone
+    AND DATE(reservation_datetime) = DATE(:target_date)
+    ORDER BY reservation_datetime
+""")
+
+GET_RESERVATIONS_BY_PHONE = text("""
+    SELECT 
+        id,
+        customer_name,
+        customer_phone,
+        reservation_datetime,
+        number_of_guests,
+        extra_infos
+    FROM reservations
+    WHERE customer_phone = :phone
+    ORDER BY reservation_datetime
+""")
+
+DELETE_RESERVATION_TABLES = text("""
+    DELETE FROM reservation_tables
+    WHERE reservation_id = :reservation_id
+""")
+
+DELETE_RESERVATION = text("""
+    DELETE FROM reservations
+    WHERE id = :reservation_id
+""")

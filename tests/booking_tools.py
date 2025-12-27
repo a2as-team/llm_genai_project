@@ -6,7 +6,7 @@ from datetime import datetime
 async def test_validate_booking():
 
     booking_request = BookingRequest(
-        reservation_datetime=datetime(2025, 12, 2, 20, 00),
+        reservation_datetime="2024-12-24T19:30:00",
         number_of_guests=10,
         location="outdoor",
         customer_name="John Trois",

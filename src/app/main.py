@@ -17,14 +17,22 @@ from src.config import app_settings
 from src.bdd.get_db_url import create_db_pool
 from src.utils.restaurant_cache import RestaurantCache
 
+# Configure logging: INFO for our code, WARNING for Google libs (to hide prompts)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S"
+)
+
+# Silence verbose Google libraries (they log prompts at INFO/DEBUG level)
+logging.getLogger("google.adk").setLevel(logging.WARNING)
+logging.getLogger("google.genai").setLevel(logging.WARNING)
+logging.getLogger("google.api_core").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
-# Additional explicit guards (harmless if already set by setup_logging)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("python_multipart").setLevel(logging.WARNING)
-logging.getLogger("python_multipart.multipart").setLevel(logging.WARNING)
-logging.getLogger("google_genai").setLevel(logging.WARNING)
-logging.getLogger("google_genai.models").setLevel(logging.WARNING)
 
 
 def create_app() -> FastAPI:

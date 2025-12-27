@@ -1,4 +1,4 @@
-from .booking import BookingRequest, BookingResponse, TableInfo, AlternativeSlot
+from .booking import BookingRequest, BookingResponse, TableInfo, AlternativeSlot, CancelBookingResponse, ReservationSummary
 from .order_draft import DraftOrder, DraftOrderItem, DraftOrderFormule, DraftFormuleItem
 
 __all__ = [
@@ -10,4 +10,6 @@ __all__ = [
     "DraftOrderItem",
     "DraftOrderFormule",
     "DraftFormuleItem",
+    "CancelBookingResponse",
+    "ReservationSummary",
 ]

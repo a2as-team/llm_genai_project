@@ -45,3 +45,25 @@ class BookingResponse(BaseModel):
     reservation_id: Optional[UUID] = Field(default=None, description="ID de la réservation si créée")
     assigned_tables: Optional[list[TableInfo]] = Field(default=None, description="Tables assignées si succès")
     alternatives: Optional[list[AlternativeSlot]] = Field(default=None, description="Alternatives si échec")
+
+
+class CancelBookingResponse(BaseModel):
+    """Output model returned by the cancel_booking tool."""
+    success: bool = Field(..., description="True si la réservation a été annulée")
+    message: str = Field(..., description="Message explicatif pour l'agent")
+    reservations_found: Optional[list["ReservationSummary"]] = Field(
+        default=None, 
+        description="Liste des réservations trouvées si plusieurs ou si date différente"
+    )
+
+
+class ReservationSummary(BaseModel):
+    """Simplified reservation info for cancel flow."""
+    id: UUID = Field(..., description="ID de la réservation")
+    reservation_datetime: str = Field(..., description="Date et heure de la réservation (format lisible)")
+    number_of_guests: int = Field(..., description="Nombre de personnes")
+    customer_name: str = Field(..., description="Nom du client")
+
+
+# Update forward reference for CancelBookingResponse
+CancelBookingResponse.model_rebuild()
