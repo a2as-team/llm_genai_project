@@ -14,6 +14,7 @@ from typing import Optional
 
 from src.bdd.dbmanager import DBManager
 from src.models.booking import BookingRequest, BookingResponse, TableInfo, AlternativeSlot
+from src.utils.sse_manager import sse_manager, EventType
 
 # Timezone du restaurant (Paris)
 RESTAURANT_TZ = ZoneInfo("Europe/Paris")
@@ -300,6 +301,22 @@ async def validate_booking(booking: BookingRequest) -> BookingResponse:
             
             total_capacity = sum(t["capacity"] for t in available)
             table_names = ", ".join(t["name"] for t in available)
+            
+            # Publier l'événement SSE
+            await sse_manager.publish_reservation_event(
+                EventType.RESERVATION_CREATED,
+                {
+                    "id": str(reservation_id),
+                    "customer_name": booking.customer_name,
+                    "customer_phone": booking.customer_phone,
+                    "number_of_guests": booking.number_of_guests,
+                    "reservation_datetime": reservation_dt.isoformat(),
+                    "location": booking.location,
+                    "table_names": table_names,
+                    "total_capacity": total_capacity,
+                    "created_at": datetime.now(RESTAURANT_TZ).isoformat(),
+                }
+            )
             
             return BookingResponse(
                 success=True,

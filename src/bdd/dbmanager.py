@@ -58,26 +58,28 @@ class DBManager:
         """
         Initialize complete database.
 
-        - Uses ADK (sync) to create its core tables (sessions, events, states)
+        - Uses ADK (async) to create its core tables (sessions, events, states)
         - Creates business logic tables on the same engine
         - Recreates async engine for backend
         """
         print("🚀 Complete database initialization via ADK...")
 
-        # 1. Launch ADK (sync) → creates its own tables
-        adk_service = DatabaseSessionService(db_url=DATABASE_URL_SYNC)
-        adk_engine = adk_service.db_engine
+        # 1. Launch ADK (async) and force table creation
+        adk_service = DatabaseSessionService(db_url=DATABASE_URL_ASYNC)
+        await adk_service._ensure_tables_created()  # Force ADK to create its tables
+        print("✅ ADK tables created (sessions, events, app_states, user_states).")
+        
+        # 2. Create business logic tables using ADK's async engine
+        async with adk_service.db_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ Business logic tables created.")
 
-        # 2. Create business logic tables on ADK engine
-        Base.metadata.create_all(bind=adk_engine)
-        print("✅ ADK + business logic tables created (via ADK sync engine).")
-
-        # 3. Recreate async engine for backend
+        # 3. Recreate async engine for backend operations
         self.engine = create_async_engine(DATABASE_URL_ASYNC, echo=False, future=True)
         self.SessionLocal = async_sessionmaker(
             self.engine, expire_on_commit=False, class_=AsyncSession
         )
-        print("🔄 Async engine restored for backend.")
+        print("🔄 Async engine ready for backend.")
 
     async def get_db(self):
         """Context manager for async database session."""
@@ -334,4 +336,56 @@ class DBManager:
                 })
 
         return str(new_reservation_id)
+
+    # -----------------------------------------------------
+    # CANCEL BOOKING METHODS
+    # -----------------------------------------------------
+
+    async def find_reservations_by_phone_and_date(self, phone: str, target_date: datetime) -> list[dict]:
+        """Find reservations matching phone number and date."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_RESERVATIONS_BY_PHONE_AND_DATE, {
+                "phone": phone,
+                "target_date": target_date
+            })
+            rows = result.fetchall()
+        
+        return [
+            {
+                "id": row[0],
+                "customer_name": row[1],
+                "customer_phone": row[2],
+                "reservation_datetime": row[3],
+                "number_of_guests": row[4],
+                "extra_infos": row[5]
+            }
+            for row in rows
+        ]
+
+    async def find_reservations_by_phone(self, phone: str) -> list[dict]:
+        """Find all reservations for a phone number."""
+        async with self.engine.begin() as conn:
+            result = await conn.execute(GET_RESERVATIONS_BY_PHONE, {"phone": phone})
+            rows = result.fetchall()
+        
+        return [
+            {
+                "id": row[0],
+                "customer_name": row[1],
+                "customer_phone": row[2],
+                "reservation_datetime": row[3],
+                "number_of_guests": row[4],
+                "extra_infos": row[5]
+            }
+            for row in rows
+        ]
+
+    async def delete_reservation(self, reservation_id) -> bool:
+        """Delete a reservation and its table associations."""
+        async with self.engine.begin() as conn:
+            # First delete table associations
+            await conn.execute(DELETE_RESERVATION_TABLES, {"reservation_id": reservation_id})
+            # Then delete the reservation
+            await conn.execute(DELETE_RESERVATION, {"reservation_id": reservation_id})
+        return True
 

@@ -1,0 +1,11 @@
+.venv/
+.vscode/
+examples/
+tests/
+.env
+.gitignore
+*/pycache/
+*/.DS_Store/
+.env.exemple
+test_livechat.html
+test

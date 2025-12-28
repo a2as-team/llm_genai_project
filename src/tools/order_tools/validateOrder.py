@@ -1,10 +1,8 @@
-import json
-import re
 from src.bdd.dbmanager import DBManager
-from src.models.order_draft import DraftOrder, DraftOrderItem, DraftOrderFormule, DraftFormuleItem
+from src.models.order_draft import DraftOrder
 from src.prompts.validatorPrompt import VALIDATOR_PROMPT
 from src.config import gemini_settings
-from logging import getLogger
+from src.utils.sse_manager import sse_manager, EventType
 
 
 async def validate_order(order_text: str, customerName: str, customerPhone: str = "") -> dict:
@@ -66,13 +64,11 @@ async def validate_order(order_text: str, customerName: str, customerPhone: str 
                 },
             )
         except Exception as err:
-            print(f"[Planner] Gemini API call failed: {err}")
             raise ValueError(f"Gemini API call failed: {err}")
         
         try:
             draft_order: DraftOrder = DraftOrder.model_validate(response.parsed)
         except Exception as err:
-            print(f"[validate_order] Parsing error: {err}")
             return {
                 "success": False,
                 "message": f"Erreur de parsing de la commande: {err}"
@@ -93,14 +89,55 @@ async def validate_order(order_text: str, customerName: str, customerPhone: str 
             }
         
         # Sauvegarder en BDD
-        order_id = await db_manager.save_full_order(draft_order, customerName, customerPhone)
+        try:
+            order_id = await db_manager.save_full_order(draft_order, customerName, customerPhone)
+        except Exception as db_err:
+            return {
+                "success": False,
+                "message": f"Erreur lors de l'enregistrement en base de données: {str(db_err)}"
+            }
+        
+        # Récupérer la commande complète depuis la BDD pour avoir tous les champs (created_at, updated_at, etc.)
+        from sqlalchemy import select
+        from src.bdd.schema import Order
+        from sqlalchemy.orm import selectinload
+        
+        # Préparer les données SSE dans la session pour éviter le lazy loading
+        sse_data = None
+        async with db_manager.SessionLocal() as session:
+            # Charger l'order avec ses relations (eager loading)
+            query = select(Order).options(
+                selectinload(Order.items),
+                selectinload(Order.formules)
+            ).where(Order.id == order_id)
+            result = await session.execute(query)
+            order = result.scalar_one_or_none()
+            
+            # Extraire les données DANS la session (avant que la session ne se ferme)
+            if order:
+                sse_data = {
+                    "id": str(order.id),
+                    "customer_name": order.customer_name,
+                    "customer_phone": order.customer_phone,
+                    "is_validated": order.is_validated,
+                    "items_count": len(order.items),
+                    "formules_count": len(order.formules),
+                    "created_at": order.created_at.isoformat() if order.created_at else None,
+                    "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+                }
+        
+        # Publier l'événement SSE avec les données extraites
+        if sse_data:
+            try:
+                await sse_manager.publish_order_event(EventType.ORDER_CREATED, sse_data)
+            except Exception:
+                pass  # Erreur SSE non bloquante
         
         return {
             "success": True,
             "message": "Commande validée et enregistrée avec succès!",
         }
     except Exception as e:
-        print(f"[validate_order] Exception: {e}")
         return {
             "success": False,
             "message": f"Erreur lors de la validation de la commande: {str(e)}"

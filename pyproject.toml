@@ -9,8 +9,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "google-adk>=1.18.0",
-    "google-genai>=1.50.1",
+    "google-adk>=1.21.0",
+    "google-genai>=1.56.0",
     "pandas>=2.3.3",
     "pydantic>=2.12.4",
     "pydantic-settings>=2.12.0",
@@ -19,6 +19,7 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "sqlalchemy>=2.0.43",
     "ortools>=9.14.6206",
+    "greenlet>=3.2.4",
 ]
 
 [tool.uv]
