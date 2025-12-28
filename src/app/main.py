@@ -19,7 +19,7 @@ from src.utils.restaurant_cache import RestaurantCache
 
 # Configure logging: INFO for our code, WARNING for Google libs (to hide prompts)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     datefmt="%H:%M:%S"
 )
