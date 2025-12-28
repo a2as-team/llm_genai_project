@@ -272,7 +272,7 @@
             const userId = document.getElementById('userId').value;
             const sessionId = document.getElementById('sessionId').value;
             
-            let url = `ws://localhost:8000/api/ws`;
+            let url = `wss://llm-genai-back-162457421857.europe-west9.run.app/api/ws`;
             const params = new URLSearchParams();
             if (userId) params.append('user_id', userId);
             if (sessionId) params.append('session_id', sessionId);

@@ -30,8 +30,9 @@ load_dotenv()
 router = APIRouter(tags=["LiveChat"])
 logger = logging.getLogger(__name__)
 
+
 db_session_service = DatabaseSessionService(
-    db_url=database_settings.dsn
+    db_url=database_settings.dsn_sqlalchemy_async
 )
 
 async def start_agent_session(user_id: str, session_id: Optional[str] = None):
@@ -110,7 +111,8 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
         ),
         proactivity=types.ProactivityConfig(
             proactive_audio=True,
-        ),        
+        ),   
+             
     )
 
     # Start agent session
@@ -126,6 +128,7 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
 async def agent_to_client_messaging(websocket: WebSocket, live_events):
     """Agent to client communication: Sends structured event data."""
     logger.info("Agent-to-client messaging started")
+    
     try:
         async for event in live_events:
             try:

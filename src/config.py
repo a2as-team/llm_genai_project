@@ -72,7 +72,7 @@ class DatabaseSettings(BaseSettings):
     @property
     def dsn(self) -> str:
         """
-        Construct the complete PostgreSQL DSN string (asyncpg format).
+        Construct the complete PostgreSQL DSN string (base format).
         Returns:
             str: PostgreSQL connection string
         """
@@ -84,6 +84,16 @@ class DatabaseSettings(BaseSettings):
             dsn = f"postgresql://{self.DB_USER_SQL}:{encoded_password}@{self.DB_HOST_SQL}:{self.DB_PORT_SQL}/{self.DB_NAME_SQL}"
 
         return dsn
+
+    @property
+    def dsn_sqlalchemy_async(self) -> str:
+        """
+        Construct the PostgreSQL DSN for SQLAlchemy async engine (asyncpg driver).
+        Used by ADK's DatabaseSessionService.
+        Returns:
+            str: PostgreSQL+asyncpg connection string for SQLAlchemy
+        """
+        return self.dsn.replace("postgresql://", "postgresql+asyncpg://")
 
 gemini_settings = GeminiSettings()
 database_settings = DatabaseSettings()  # type: ignore
