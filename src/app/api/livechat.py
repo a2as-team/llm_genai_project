@@ -3,6 +3,7 @@ import asyncio
 import base64
 import logging
 import uuid
+import re
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -29,6 +30,62 @@ load_dotenv()
 
 router = APIRouter(tags=["LiveChat"])
 logger = logging.getLogger(__name__)
+
+# Patterns to detect when agent claims to have done something
+# These are French phrases that indicate a confirmation of an action
+CONFIRMATION_PATTERNS = [
+    # Order confirmations
+    r"commande.*enregistr[ée]",
+    r"commande.*valid[ée]",
+    r"commande.*confirm[ée]",
+    r"j'ai.*enregistr[ée].*commande",
+    r"votre commande.*prise",
+    r"c'est not[ée]",
+    # Booking confirmations
+    r"r[ée]servation.*confirm[ée]",
+    r"r[ée]servation.*enregistr[ée]",
+    r"table.*r[ée]serv[ée]",
+    r"j'ai.*r[ée]serv[ée]",
+    r"r[ée]servation.*valid[ée]",
+    # Cancellation confirmations
+    r"r[ée]servation.*annul[ée]",
+    r"j'ai.*annul[ée]",
+    r"annulation.*confirm[ée]",
+]
+
+# Tools that MUST be called before certain confirmations
+REQUIRED_TOOLS_FOR_ACTION = {
+    "order": ["validate_order"],
+    "booking": ["validate_booking"],
+    "cancel": ["cancel_booking"],
+}
+
+def detect_confirmation_without_tool(text: str, tools_called_in_turn: set) -> Optional[str]:
+    """
+    Detect if the agent is confirming an action without having called the required tool.
+    Returns a warning message if detected, None otherwise.
+    """
+    text_lower = text.lower()
+    
+    for pattern in CONFIRMATION_PATTERNS:
+        if re.search(pattern, text_lower):
+            # Determine which type of action this is
+            if any(word in text_lower for word in ["commande", "commandé"]):
+                action_type = "order"
+            elif any(word in text_lower for word in ["annul"]):
+                action_type = "cancel"
+            elif any(word in text_lower for word in ["réserv", "reserv", "table"]):
+                action_type = "booking"
+            else:
+                continue
+            
+            # Check if the required tool was called
+            required_tools = REQUIRED_TOOLS_FOR_ACTION.get(action_type, [])
+            if not any(tool in tools_called_in_turn for tool in required_tools):
+                return f"⚠️ HALLUCINATION DETECTED: Agent confirmed '{action_type}' action but never called {required_tools}. Pattern matched: '{pattern}'"
+    
+    return None
+
 
 db_session_service = DatabaseSessionService(
     db_url=database_settings.dsn
@@ -110,7 +167,8 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
         ),
         proactivity=types.ProactivityConfig(
             proactive_audio=True,
-        ),        
+        ),   
+             
     )
 
     # Start agent session
@@ -126,6 +184,11 @@ async def start_agent_session(user_id: str, session_id: Optional[str] = None):
 async def agent_to_client_messaging(websocket: WebSocket, live_events):
     """Agent to client communication: Sends structured event data."""
     logger.info("Agent-to-client messaging started")
+    
+    # Track tool calls within the current turn to detect hallucinations
+    tools_called_in_turn: set = set()
+    accumulated_text_in_turn: str = ""
+    
     try:
         async for event in live_events:
             try:
@@ -150,6 +213,19 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                 if not event.content:
                     if (message_to_send["turn_complete"] or message_to_send["interrupted"]):
                         logger.debug(f"Control message: turn_complete={message_to_send['turn_complete']}, interrupted={message_to_send['interrupted']}")
+                        
+                        # At turn end, check for hallucinations in accumulated text
+                        if accumulated_text_in_turn:
+                            warning = detect_confirmation_without_tool(accumulated_text_in_turn, tools_called_in_turn)
+                            if warning:
+                                logger.warning(warning)
+                                logger.warning(f"Tools called this turn: {tools_called_in_turn}")
+                                logger.warning(f"Agent text this turn: {accumulated_text_in_turn[:300]}...")
+                        
+                        # Reset tracking for next turn
+                        tools_called_in_turn.clear()
+                        accumulated_text_in_turn = ""
+                        
                         await websocket.send_text(json.dumps(message_to_send))
                     continue 
 
@@ -162,6 +238,9 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                             "text": transcription_text,
                             "is_final": not event.partial
                         }
+                        # User speaking = new turn, reset tracking
+                        tools_called_in_turn.clear()
+                        accumulated_text_in_turn = ""
                 
                 else:
                     if transcription_text:
@@ -171,6 +250,9 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                             "is_final": not event.partial
                         }
                         message_to_send["parts"].append({"type": "text", "data": transcription_text})
+                        
+                        # Accumulate text for hallucination detection
+                        accumulated_text_in_turn += " " + transcription_text
 
                     for part in event.content.parts:
                         if part.inline_data and part.inline_data.mime_type.startswith("audio/pcm"):
@@ -180,6 +262,8 @@ async def agent_to_client_messaging(websocket: WebSocket, live_events):
                         
                         elif part.function_call:
                             logger.info(f"Tool call: {part.function_call.name}({part.function_call.args})")
+                            # Track the tool call
+                            tools_called_in_turn.add(part.function_call.name)
                             message_to_send["parts"].append({
                                 "type": "function_call", 
                                 "data": {

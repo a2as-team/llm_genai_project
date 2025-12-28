@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from typing import AsyncGenerator
 
 from src.bdd.dbmanager import DBManager
-from src.bdd.schema import Order, Reservation, OrderFormule, OrderItem, MenuItem, RestaurantTable
+from src.bdd.schema import Order, Reservation, OrderFormule, OrderItem, OrderFormuleItem, MenuItem, RestaurantTable
 from src.utils.sse_manager import sse_manager, EventType
 
 logger = logging.getLogger(__name__)
@@ -43,85 +43,6 @@ class OrderUpdateRequest(BaseModel):
 class ReservationUpdateRequest(BaseModel):
     """Request model for updating reservation fields."""
     pass
-
-
-# ============================================================================
-# CLIENT ROUTES - Simple endpoints for customers
-# ============================================================================
-
-
-@router.get("/orders/customer/{customer_name}", response_model=List[dict])
-async def get_orders_by_customer(
-    customer_name: str,
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 50,
-):
-    """Get all orders for a specific customer by name (case-insensitive)."""
-    try:
-        # Use LOWER for case-insensitive search
-        query = select(Order).where(
-            func.lower(Order.customer_name) == customer_name.lower()
-        ).options(
-            selectinload(Order.formules),
-            selectinload(Order.items)
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        orders = result.scalars().all()
-
-        return [
-            {
-                "id": str(order.id),
-                "customer_name": order.customer_name,
-                "customer_phone": order.customer_phone,
-                "is_validated": order.is_validated,
-                "created_at": order.created_at.isoformat() if order.created_at else None,
-                "updated_at": order.updated_at.isoformat() if order.updated_at else None,
-                "formules_count": len(order.formules),
-                "items_count": len(order.items),
-            }
-            for order in orders
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching orders for customer {customer_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching customer orders")
-
-
-@router.get("/reservations/customer/{customer_name}", response_model=List[dict])
-async def get_reservations_by_customer(
-    customer_name: str,
-    db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 50,
-):
-    """Get all reservations for a specific customer by name (case-insensitive)."""
-    try:
-        # Use LOWER for case-insensitive search
-        query = select(Reservation).where(
-            func.lower(Reservation.customer_name) == customer_name.lower()
-        ).options(
-            selectinload(Reservation.tables)
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        reservations = result.scalars().all()
-
-        return [
-            {
-                "id": str(reservation.id),
-                "customer_name": reservation.customer_name,
-                "customer_phone": reservation.customer_phone,
-                "reservation_datetime": reservation.reservation_datetime.isoformat() if reservation.reservation_datetime else None,
-                "number_of_guests": reservation.number_of_guests,
-                "extra_infos": reservation.extra_infos,
-                "created_at": reservation.created_at.isoformat() if reservation.created_at else None,
-                "updated_at": reservation.updated_at.isoformat() if reservation.updated_at else None,
-                "tables_count": len(reservation.tables),
-            }
-            for reservation in reservations
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching reservations for customer {customer_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching customer reservations")
 
 
 # ============================================================================
@@ -170,8 +91,8 @@ async def get_orders_admin(
         
         # Combine all filters with AND
         query = select(Order).options(
-            selectinload(Order.formules),
-            selectinload(Order.items)
+            selectinload(Order.formules).selectinload(OrderFormule.items).selectinload(OrderFormuleItem.item),
+            selectinload(Order.items).selectinload(OrderItem.item)
         )
         
         if filters:
@@ -181,6 +102,50 @@ async def get_orders_admin(
         result = await db.execute(query)
         orders = result.scalars().all()
         
+        def calculate_order_total(order: Order) -> float:
+            """Calculate total price of an order."""
+            total = 0.0
+            # Sum formules prices
+            for formule in order.formules:
+                total += float(formule.formula_base_price) * formule.quantity
+            # Sum individual items prices
+            for order_item in order.items:
+                if order_item.item:
+                    total += float(order_item.item.price) * order_item.quantity
+            return round(total, 2)
+        
+        def serialize_order_items(order: Order) -> list:
+            """Serialize order items with details."""
+            return [
+                {
+                    "id": str(oi.id),
+                    "name": oi.item.name if oi.item else "Unknown",
+                    "quantity": oi.quantity,
+                    "unit_price": float(oi.item.price) if oi.item else 0,
+                    "indications": oi.indications,
+                }
+                for oi in order.items
+            ]
+        
+        def serialize_order_formules(order: Order) -> list:
+            """Serialize order formules with their items."""
+            return [
+                {
+                    "id": str(of.id),
+                    "name": of.formule_name,
+                    "quantity": of.quantity,
+                    "base_price": float(of.formula_base_price),
+                    "items": [
+                        {
+                            "name": ofi.item.name if ofi.item else "Unknown",
+                            "indications": ofi.indications,
+                        }
+                        for ofi in of.items
+                    ] if of.items else [],
+                }
+                for of in order.formules
+            ]
+        
         return [
             {
                 "id": str(order.id),
@@ -189,8 +154,9 @@ async def get_orders_admin(
                 "is_validated": order.is_validated,
                 "created_at": order.created_at.isoformat() if order.created_at else None,
                 "updated_at": order.updated_at.isoformat() if order.updated_at else None,
-                "formules_count": len(order.formules),
-                "items_count": len(order.items),
+                "total_price": calculate_order_total(order),
+                "formules": serialize_order_formules(order),
+                "items": serialize_order_items(order),
             }
             for order in orders
         ]
@@ -256,7 +222,15 @@ async def get_reservations_admin(
                 "extra_infos": reservation.extra_infos,
                 "created_at": reservation.created_at.isoformat() if reservation.created_at else None,
                 "updated_at": reservation.updated_at.isoformat() if reservation.updated_at else None,
-                "tables_count": len(reservation.tables),
+                "tables": [
+                    {
+                        "id": str(table.id),
+                        "name": table.name,
+                        "capacity": table.capacity,
+                        "location": table.location,
+                    }
+                    for table in reservation.tables
+                ],
             }
             for reservation in reservations
         ]
