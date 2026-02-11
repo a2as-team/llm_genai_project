@@ -1,0 +1,512 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: gabrielcarlotti/llm_genai_project
+    source: https://github.com/gabrielcarlotti/llm_genai_project
+    branch: main
+    commit: "c2e21ce5"
+    scope: [src/agents/__init__.py, src/agents/root_agent/__init__.py, src/agents/root_agent/rootAgent.py, src/app/api/livechat.py,
+      src/config.py, src/prompts/__init__.py, src/tools/__init__.py, src/tools/booking_tools/__init__.py, src/tools/order_tools/__init__.py,
+      src/tools/order_tools/validateOrder.py, src/tools/shared_tools/__init__.py, src/tools/shared_tools/getInformations.py,
+      src/tools/shared_tools/getMenu.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:50:54Z'
+    url: https://a2as.org/certified/agents/gabrielcarlotti/llm_genai_project
+  signatures:
+    digest: sha256:-vze8n7M5Uqre_X0haej2XK502WB_zODB4INw0ZnveU
+    key: ed25519:u5fQDdgVb2Dj3fGcWDBjvOmsDDam65I4y2USisXgFeU
+    sig: ed25519:_G0f8PO1PBaeq973vRfa9GGFywfG_Zt1pBkQxizyeaYcE-yEGajr7RXudP3j--Wgs4FViCG2J0Xg1hmPab-oAQ
+
+agents:
+  root_agent:
+    type: instance
+    models: [gemini_settings.LIVE_MODEL_NAME]
+    tools: [get_menu, get_informations, validate_order, validate_booking, cancel_booking]
+    params:
+      name: rootAgent
+      instruction: get_root_prompt()
+      function: create_root_agent
+
+models:
+  gemini_settings.LIVE_MODEL_NAME:
+    type: literal
+    agents: [root_agent]
+
+tools:
+  cancel_booking:
+    type: function
+    agents: [root_agent]
+    params:
+      description: |-
+        Cancels a restaurant reservation.
+
+        This tool handles reservation cancellation with the following workflow:
+
+        1. If reservation_id is provided → delete directly
+        2. Otherwise search by phone + date:
+           - If unique match found → delete and confirm
+           - If multiple matches → return all, ask user to clarify
+           - If no match → search by phone only:
+             - If found → return them, suggest user may have wrong date
+             - If nothing → inform no reservation for this phone
+
+        Parameters:
+        - phone_number: Customer's phone number
+        - date: Date of the reservation (various formats accepted)
+        - reservation_id: Direct ID if user already specified which one (empty string if not provided)
+
+        Returns:
+        - CancelBookingResponse with success status, message, and found reservations if any
+  get_informations:
+    type: function
+    agents: [root_agent]
+    params:
+      description: Return the complete informations of the restaurant such as location, opening hours, rules, website and
+        all of these kind of infos.
+  get_menu:
+    type: function
+    agents: [root_agent]
+    params:
+      description: Return the complete menu of the restaurant.
+  validate_booking:
+    type: function
+    agents: [root_agent]
+    params:
+      description: |-
+        Validates and creates a restaurant reservation.
+
+        This tool receives booking information from the agent and:
+        1. Validates the requested time is within service hours
+        2. Runs a greedy algorithm to find available tables
+        3. If available: creates the reservation and returns success
+        4. If not available: returns up to 3 alternative time slots
+
+        Parameters:
+        - booking: BookingRequest with datetime, guests, location, customer info
+
+        Returns:
+        - BookingResponse with success status, message, and alternatives if needed
+  validate_order:
+    type: function
+    agents: [root_agent]
+    params:
+      description: |-
+        Validates and saves a customer order using an LLM validator.
+
+        This tool receives a natural language description of the order,
+        sends it to a validation LLM that parses it into a structured format,
+        validates against the menu, and saves to database if valid.
+
+        Parameters:
+        - order_text: str - Description textuelle de la commande (ex: "2 pizzas margherita, 1 tiramisu, une formule midi avec une calzone et un coca")
+        - customerName: str - Nom du client (obligatoire)
+        - customerPhone: str - Téléphone du client (optionnel)
+
+        Returns:
+        - dict avec "success", "message"
+
+imports:
+  '*': src.bdd.query.*
+  Agent: google.adk.agents.Agent
+  AlternativeSlot: src.models.booking.AlternativeSlot
+  Any: typing.Any
+  APIRouter: fastapi.APIRouter
+  app_settings: src.config.app_settings
+  async_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker
+  asyncio: asyncio
+  AsyncSession: sqlalchemy.ext.asyncio.AsyncSession
+  Base: src.bdd.schema.Base
+  base64: base64
+  BaseModel: pydantic.BaseModel
+  BaseSettings: pydantic_settings.BaseSettings
+  Blob: google.genai.types.Blob
+  BookingRequest: src.models.booking.BookingRequest
+  BookingResponse: src.models.booking.BookingResponse
+  Boolean: sqlalchemy.Boolean
+  Callable: typing.Callable
+  cancel_booking: booking_tools.cancel_booking
+  CancelBookingResponse: src.models.booking.CancelBookingResponse
+  clear_request_context: src.utils.context.clear_request_context
+  Column: sqlalchemy.Column
+  Content: google.genai.types.Content
+  create_async_engine: sqlalchemy.ext.asyncio.create_async_engine
+  database_settings: src.config.database_settings
+  DatabaseSessionService: google.adk.sessions.database_session_service.DatabaseSessionService
+  datetime: datetime.datetime
+  DBManager: src.bdd.dbmanager.DBManager
+  DeclarativeBase: sqlalchemy.orm.DeclarativeBase
+  Dict: typing.Dict
+  DraftOrder: src.models.order_draft.DraftOrder
+  Enum: enum.Enum
+  EventType: src.utils.sse_manager.EventType
+  Field: pydantic.Field
+  ForeignKey: sqlalchemy.ForeignKey
+  func: sqlalchemy.sql.func
+  gemini_settings: src.config.gemini_settings
+  genai: google.genai
+  get_informations: shared_tools.get_informations
+  get_menu: shared_tools.get_menu
+  get_root_prompt: rootPrompt.get_root_prompt
+  getLogger: logging.getLogger
+  health_router: health.router
+  Integer: sqlalchemy.Integer
+  json: json
+  List: typing.List
+  livechat_router: livechat.router
+  LiveRequestQueue: google.adk.agents.LiveRequestQueue
+  load_dotenv: dotenv.load_dotenv
+  logging: logging
+  Mapped: sqlalchemy.orm.Mapped
+  mapped_column: sqlalchemy.orm.mapped_column
+  Numeric: sqlalchemy.Numeric
+  Optional: typing.Optional
+  Order: src.bdd.schema.Order
+  orders_reservations_router: orders_reservations.router
+  Part: google.genai.types.Part
+  quote_plus: urllib.parse.quote_plus
+  relationship: sqlalchemy.orm.relationship
+  ReservationSummary: src.models.booking.ReservationSummary
+  RestaurantCache: src.utils.restaurant_cache.RestaurantCache
+  root_agent: root_agent.root_agent
+  ROOT_PROMPT: rootPrompt.ROOT_PROMPT
+  RunConfig: google.adk.agents.run_config.RunConfig
+  Runner: google.adk.runners.Runner
+  select: sqlalchemy.select
+  selectinload: sqlalchemy.orm.selectinload
+  Set: typing.Set
+  set_request_context: src.utils.context.set_request_context
+  SettingsConfigDict: pydantic_settings.SettingsConfigDict
+  sse_manager: src.utils.sse_manager.sse_manager
+  StreamingMode: google.adk.agents.run_config.StreamingMode
+  String: sqlalchemy.String
+  Table: sqlalchemy.Table
+  TableInfo: src.models.booking.TableInfo
+  text: sqlalchemy.text
+  Text: sqlalchemy.Text
+  threading: threading
+  Time: sqlalchemy.Time
+  timedelta: datetime.timedelta
+  TIMESTAMP: sqlalchemy.TIMESTAMP
+  types: google.genai.types
+  Union: typing.Union
+  UUID: uuid.UUID
+  uuid: uuid
+  uuid4: uuid.uuid4
+  validate_booking: booking_tools.validate_booking
+  validate_order: validateOrder.validate_order
+  VALIDATOR_PROMPT: validatorPrompt.VALIDATOR_PROMPT
+  WebSocket: fastapi.WebSocket
+  WebSocketDisconnect: starlette.websockets.WebSocketDisconnect
+  ZoneInfo: zoneinfo.ZoneInfo
+
+functions:
+  __init__:
+    type: sync
+    module: src.config
+    args: [self]
+  _get_lock:
+    type: async
+    module: src.utils.sse_manager
+    args: [self]
+    params:
+      returns: asyncio.Lock
+  agent_to_client_messaging:
+    type: async
+    module: src.app.api.livechat
+    args: [websocket, live_events]
+  cancel_booking:
+    type: async
+    module: src.tools.booking_tools.cancelBooking
+    args: [phone_number, date, reservation_id]
+    params:
+      returns: CancelBookingResponse
+  clear_db:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+  clear_tables:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+  client_to_agent_messaging:
+    type: async
+    module: src.app.api.livechat
+    args: [websocket, live_request_queue]
+  create_db:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+  create_root_agent:
+    type: sync
+    module: src.agents.root_agent.rootAgent
+    params:
+      returns: Agent
+  delete_reservation:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, reservation_id]
+    params:
+      returns: bool
+  dsn:
+    type: sync
+    module: src.config
+    args: [self]
+    params:
+      returns: str
+  dsn_sqlalchemy_async:
+    type: sync
+    module: src.config
+    args: [self]
+    params:
+      returns: str
+  find_available_tables:
+    type: sync
+    module: src.tools.booking_tools.validateBooking
+    args: [tables, combinations, reservations, requested_dt, num_guests, duration_minutes, buffer_minutes]
+    params:
+      returns: Optional[list[dict]]
+  find_reservations_by_phone:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, phone]
+    params:
+      returns: list[dict]
+  find_reservations_by_phone_and_date:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, phone, target_date]
+    params:
+      returns: list[dict]
+  format_reservation_datetime:
+    type: sync
+    module: src.tools.booking_tools.cancelBooking
+    args: [dt]
+    params:
+      returns: str
+  get_all_tables:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+    params:
+      returns: list[dict]
+  get_db:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+  get_formule_price:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, name]
+    params:
+      returns: Optional[float]
+  get_hours:
+    type: sync
+    module: src.utils.restaurant_cache
+    args: [cls]
+    params:
+      returns: dict
+  get_informations:
+    type: async
+    module: src.tools.shared_tools.getInformations
+    params:
+      returns: str
+  get_item_price:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, name]
+    params:
+      returns: Optional[float]
+  get_max_capacity:
+    type: sync
+    module: src.utils.restaurant_cache
+    args: [cls]
+    params:
+      returns: int
+  get_menu:
+    type: async
+    module: src.tools.shared_tools.getMenu
+    params:
+      returns: str
+  get_orders_subscribers_count:
+    type: sync
+    module: src.utils.sse_manager
+    args: [self]
+    params:
+      returns: int
+  get_reservations_for_date:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, target_date]
+    params:
+      returns: list[dict]
+  get_reservations_subscribers_count:
+    type: sync
+    module: src.utils.sse_manager
+    args: [self]
+    params:
+      returns: int
+  get_restaurant_hours:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+    params:
+      returns: dict
+  get_restaurant_settings:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+    params:
+      returns: dict
+  get_root_prompt:
+    type: sync
+    module: src.prompts.rootPrompt
+    params:
+      returns: str
+  get_service_slots_for_date:
+    type: sync
+    module: src.tools.booking_tools.validateBooking
+    args: [date, hours, slot_minutes]
+    params:
+      returns: list[datetime]
+  get_table_combinations:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+    params:
+      returns: list[tuple]
+  get_tables_by_location:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, location]
+    params:
+      returns: list[dict]
+  initialize:
+    type: async
+    module: src.utils.restaurant_cache
+    args: [cls]
+    params:
+      returns: None
+  is_initialized:
+    type: sync
+    module: src.utils.restaurant_cache
+    args: [cls]
+    params:
+      returns: bool
+  is_within_service_hours:
+    type: sync
+    module: src.tools.booking_tools.validateBooking
+    args: [dt, hours]
+    params:
+      returns: bool
+  parse_date_string:
+    type: sync
+    module: src.tools.booking_tools.cancelBooking
+    args: [date_str]
+    params:
+      returns: datetime
+  parse_datetime_string:
+    type: sync
+    module: src.tools.booking_tools.validateBooking
+    args: [dt_str]
+    params:
+      returns: datetime
+  parse_hour:
+    type: sync
+    module: src.tools.booking_tools.validateBooking
+    args: [hour_str]
+    params:
+      returns: tuple
+  populate_initial_data:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+  publish_order_event:
+    type: async
+    module: src.utils.sse_manager
+    args: [self, event_type, data]
+  publish_reservation_event:
+    type: async
+    module: src.utils.sse_manager
+    args: [self, event_type, data]
+  reset:
+    type: sync
+    module: src.utils.restaurant_cache
+    args: [cls]
+    params:
+      returns: None
+  save_full_order:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, draft_order, customer_name, customer_phone]
+    params:
+      returns: str
+  save_reservation:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self, customer_name, customer_phone, reservation_datetime, number_of_guests, table_ids, extra_infos]
+    params:
+      returns: str
+  start_agent_session:
+    type: async
+    module: src.app.api.livechat
+    args: [user_id, session_id]
+  subscribe_orders:
+    type: async
+    module: src.utils.sse_manager
+    args: [self]
+    params:
+      returns: asyncio.Queue
+  subscribe_reservations:
+    type: async
+    module: src.utils.sse_manager
+    args: [self]
+    params:
+      returns: asyncio.Queue
+  tables_overlap:
+    type: sync
+    module: src.tools.booking_tools.validateBooking
+    args: [requested_dt, duration_minutes, buffer_minutes, existing_reservations, table_id]
+    params:
+      returns: bool
+  test_db:
+    type: async
+    module: src.bdd.dbmanager
+    args: [self]
+  to_sse_format:
+    type: sync
+    module: src.utils.sse_manager
+    args: [self]
+    params:
+      returns: str
+  total_item_count:
+    type: sync
+    module: src.models.order_draft
+    args: [self]
+    params:
+      returns: int
+  unsubscribe_orders:
+    type: async
+    module: src.utils.sse_manager
+    args: [self, queue]
+  unsubscribe_reservations:
+    type: async
+    module: src.utils.sse_manager
+    args: [self, queue]
+  validate_booking:
+    type: async
+    module: src.tools.booking_tools.validateBooking
+    args: [booking]
+    params:
+      returns: BookingResponse
+  validate_order:
+    type: async
+    module: src.tools.order_tools.validateOrder
+    args: [order_text, customerName, customerPhone]
+    params:
+      returns: dict
+  websocket_endpoint:
+    type: async
+    module: src.app.api.livechat
+    args: [websocket, user_id, session_id]
